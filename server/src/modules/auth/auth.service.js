@@ -158,7 +158,9 @@ const forgotPassword = async ({ email }) => {
   const user = await fetchAuthUserByEmail(email);
 
   if (!user) {
-    throw new AppError("Email address does not exist", 404);
+    return {
+      message: 'If an account exists for that email, a password reset link has been sent.',
+    };
   }
 
   const resetToken = generateRandomToken();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
 import { login, clearError } from '../../features/auth/authSlice';
 import { RootState, AppDispatch } from '../../app/store';
@@ -10,26 +10,52 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
+  const [resendStatus, setResendStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [resendLoading, setResendLoading] = useState(false);
   
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const from = (location.state as any)?.from?.pathname || '/dashboard';
   
   const { isAuthenticated, isLoading, error } = useSelector((state: RootState) => state.auth);
 
   useEffect(() => {
     dispatch(clearError());
     setFormError('');
+    setResendStatus(null);
   }, [dispatch]);
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, from]);
+
+  const isUnverifiedEmail = Boolean(error && (error.toLowerCase().includes('verify') || error.toLowerCase().includes('unverified')));
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      setResendStatus({ type: 'error', message: 'Please enter your email address first.' });
+      return;
+    }
+    setResendLoading(true);
+    setResendStatus(null);
+    try {
+      const response = await apiClient.post('/auth/resend-verification', { email });
+      setResendStatus({ type: 'success', message: response.data.message || 'Verification email resent successfully! Check your inbox.' });
+    } catch (resendErr: any) {
+      setResendStatus({ type: 'error', message: resendErr.response?.data?.message || 'Failed to resend verification email.' });
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    setResendStatus(null);
     
     if (!email || !password) {
       setFormError('Please fill in all fields');
@@ -55,23 +81,24 @@ export default function Login() {
           <form className="space-y-6" onSubmit={handleSubmit}>
             {(error || formError) && (
               <div className="rounded-lg bg-red-950/40 border border-red-500/30 p-3 text-sm text-red-400 flex flex-col gap-2">
-                <div>{formError || error}</div>
-                {error === 'Please verify your email before logging in.' && (
+                <div>{formError || (isUnverifiedEmail ? 'Your email is not verified.' : error)}</div>
+                {isUnverifiedEmail && (
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        const response = await apiClient.post('/auth/resend-verification', { email });
-                        alert(response.data.message || 'Verification email resent successfully! Please check your inbox.');
-                      } catch (resendErr: any) {
-                        alert(resendErr.response?.data?.message || 'Failed to resend verification email.');
-                      }
-                    }}
-                    className="text-xs text-brand-400 hover:text-brand-300 font-semibold text-left underline focus:outline-none"
+                    disabled={resendLoading}
+                    onClick={handleResendVerification}
+                    className="text-xs text-brand-400 hover:text-brand-300 font-semibold text-left underline focus:outline-none flex items-center gap-1 disabled:opacity-50"
                   >
-                    Resend verification email for {email || 'your account'}?
+                    {resendLoading ? <Loader2 className="h-3 w-3 animate-spin inline" /> : null}
+                    Resend Verification Email
                   </button>
                 )}
+              </div>
+            )}
+
+            {resendStatus && (
+              <div className={`rounded-lg p-3 text-sm ${resendStatus.type === 'success' ? 'bg-emerald-950/40 border border-emerald-500/30 text-emerald-400' : 'bg-red-950/40 border border-red-500/30 text-red-400'}`}>
+                {resendStatus.message}
               </div>
             )}
 
