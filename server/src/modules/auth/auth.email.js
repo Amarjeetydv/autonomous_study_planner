@@ -1,7 +1,7 @@
 const env = require('../../config/env');
 const { sendMail } = require('../../config/mail');
 
-const getCleanFrontendUrl = () => (env.frontendUrl || 'http://localhost:3000').replace(/\/+$/, '');
+const getCleanFrontendUrl = () => (process.env.FRONTEND_URL || env.frontendUrl || 'http://localhost:3000').replace(/\/+$/, '');
 
 const buildVerificationMessage = (token, user) => {
   const baseUrl = getCleanFrontendUrl();

@@ -26,17 +26,32 @@ const fetchAuthUserByEmail = (email) => User.findOne({ email }).select(TOKEN_SEL
 const fetchAuthUserById = (id) => User.findById(id).select(TOKEN_SELECT_FIELDS);
 
 const register = async ({ name, email, password, role }) => {
+  console.log('Step 1 - Request received');
+  console.log('Step 2 - Validate request');
+
+  console.log('Step 3 - Check existing user');
+  console.time('MONGODB_FIND_USER');
   const existingUser = await User.findOne({ email });
+  console.timeEnd('MONGODB_FIND_USER');
 
   if (existingUser) {
     throw new AppError('Email already registered', 409);
   }
 
+  console.log('Step 4 - Hash password');
+  console.time('BCRYPT_HASH');
+  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+  console.timeEnd('BCRYPT_HASH');
+
+  console.log('Step 5 - Generate verification token');
   const emailVerificationToken = generateRandomToken();
+
+  console.log('Step 6 - Save user');
+  console.time('MONGODB_SAVE_USER');
   const user = await User.create({
     name,
     email,
-    passwordHash: await bcrypt.hash(password, SALT_ROUNDS),
+    passwordHash,
     roles: [role || AUTH_ROLES.STUDENT],
     status: 'pendingVerification',
     emailVerifiedAt: null,
@@ -44,17 +59,28 @@ const register = async ({ name, email, password, role }) => {
     emailVerificationToken: hashToken(emailVerificationToken),
     emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
   });
+  console.timeEnd('MONGODB_SAVE_USER');
 
-  try {
-    await sendVerificationEmail(user, emailVerificationToken);
-  } catch (emailError) {
-    const verificationUrl = `${env.auth.frontendUrl || env.frontendUrl || 'http://localhost:3000'}/verify-email?token=${encodeURIComponent(emailVerificationToken)}&email=${encodeURIComponent(user.email)}`;
-    logger.error('Failed to send verification email during registration', {
-      email: user.email,
-      error: emailError.message,
+  console.log('Step 7 - Send verification email (Non-blocking background)');
+  console.time('EMAIL_SEND_TIME');
+  sendVerificationEmail(user, emailVerificationToken)
+    .then(() => {
+      console.timeEnd('EMAIL_SEND_TIME');
+      console.log('Email sent successfully.');
+    })
+    .catch((emailError) => {
+      console.timeEnd('EMAIL_SEND_TIME');
+      console.error('❌ Email dispatch failed:', {
+        message: emailError.message,
+        code: emailError.code,
+        command: emailError.command,
+        response: emailError.response,
+        responseCode: emailError.responseCode,
+        stack: emailError.stack,
+      });
+      const verificationUrl = `${env.auth.frontendUrl || env.frontendUrl || 'http://localhost:3000'}/verify-email?token=${encodeURIComponent(emailVerificationToken)}&email=${encodeURIComponent(user.email)}`;
+      logger.info(`[DEVELOPMENT ONLY] Email Verification Link: ${verificationUrl}`);
     });
-    logger.info(`[DEVELOPMENT ONLY] Email Verification Link: ${verificationUrl}`);
-  }
 
   return {
     user: sanitizeUser(user),
@@ -169,17 +195,15 @@ const forgotPassword = async ({ email }) => {
   user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
   await user.save();
 
-  try {
-    await sendPasswordResetEmail(user, resetToken);
-  } catch (emailError) {
+  sendPasswordResetEmail(user, resetToken).catch((emailError) => {
     logger.error('Failed to send password reset email', {
       email: user.email,
       error: emailError.message,
     });
-  }
+  });
 
   return {
-    message: 'Password reset link has been sent to your email.',
+    message: 'If an account exists for that email, a password reset link has been sent.',
   };
 };
 
@@ -261,16 +285,14 @@ const resendVerification = async ({ email }) => {
   user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
   await user.save();
 
-  try {
-    await sendVerificationEmail(user, emailVerificationToken);
-  } catch (emailError) {
+  sendVerificationEmail(user, emailVerificationToken).catch((emailError) => {
     const verificationUrl = `${env.auth.frontendUrl || env.frontendUrl || 'http://localhost:3000'}/verify-email?token=${encodeURIComponent(emailVerificationToken)}`;
     logger.error('Failed to send verification email during resend', {
       email: user.email,
       error: emailError.message,
     });
     logger.info(`[DEVELOPMENT ONLY] Email Verification Link (Resend): ${verificationUrl}`);
-  }
+  });
 
   return {
     message: 'Verification email sent successfully.',

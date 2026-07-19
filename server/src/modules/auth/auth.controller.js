@@ -16,7 +16,14 @@ const {
 } = require('./auth.service');
 
 const registerController = asyncHandler(async (req, res) => {
+  console.log('\n=================== REGISTER START ===================');
+  console.time('REGISTER_TOTAL_CONTROLLER');
+
   const result = await register(req.body);
+
+  console.log('Step 8 - Return HTTP response');
+  console.timeEnd('REGISTER_TOTAL_CONTROLLER');
+  console.log('=================== REGISTER END ===================\n');
 
   return sendResponse(
     res,
