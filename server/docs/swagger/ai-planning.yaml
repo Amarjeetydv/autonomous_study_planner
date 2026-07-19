@@ -1,0 +1,28 @@
+openapi: 3.0.3
+info:
+  title: AI Planning API
+  version: 1.0.0
+paths:
+  /api/v1/ai/planning/generate:
+    post:
+      summary: Generate an AI study plan
+      responses:
+        '201':
+          description: Generated successfully
+  /api/v1/ai/planning:
+    get:
+      summary: List AI plans
+      responses:
+        '200':
+          description: Fetched successfully
+  /api/v1/ai/planning/{planId}:
+    get:
+      summary: Get an AI plan
+      responses:
+        '200':
+          description: Fetched successfully
+    delete:
+      summary: Delete an AI plan
+      responses:
+        '200':
+          description: Deleted successfully

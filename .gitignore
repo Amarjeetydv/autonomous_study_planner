@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production / Build outputs
+client/dist/
+dist/
+build/
+
+# Environment files (contains secrets/API keys)
+.env
+.env.local
+.env.development
+.env.production
+client/.env
+client/.env.*
+server/.env
+server/.env.production
+server/.env.*
+!.env.example
+!server/.env.example
+
+# Logs
+logs/
+server/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor & System files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Cache & Temp
+.eslintcache
+*.tsbuildinfo

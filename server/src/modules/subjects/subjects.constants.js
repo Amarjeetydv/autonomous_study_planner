@@ -1,0 +1,18 @@
+const SUBJECT_DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
+
+const DEFAULT_SUBJECT_SORT_FIELD = 'name';
+const DEFAULT_TOPIC_SORT_FIELD = 'order';
+const DEFAULT_SUBTOPIC_SORT_FIELD = 'order';
+
+const RECOMMENDATION_TARGET_TYPES = {
+  SUBJECT: 'subject',
+  TOPIC: 'topic',
+};
+
+module.exports = {
+  SUBJECT_DIFFICULTIES,
+  DEFAULT_SUBJECT_SORT_FIELD,
+  DEFAULT_TOPIC_SORT_FIELD,
+  DEFAULT_SUBTOPIC_SORT_FIELD,
+  RECOMMENDATION_TARGET_TYPES,
+};

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: study-planner-backend
+    env: node
+    plan: free
+    buildCommand: npm install --workspace=server
+    startCommand: node server/src/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false

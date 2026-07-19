@@ -1,0 +1,45 @@
+const express = require('express');
+const healthRoutes = require('./health.routes');
+const authRoutes = require('../../modules/auth/auth.routes');
+const profileRoutes = require('../../modules/users/profile/profile.routes');
+const subjectsRoutes = require('../../modules/subjects/subjects.routes');
+const goalsRoutes = require('../../modules/goals/goals.routes');
+const aiPlanningRoutes = require('../../modules/aiPlanning/aiPlanning.routes');
+const streamRoutes = require('../../modules/aiPlanning/stream.routes');
+const tasksRoutes = require('../../modules/tasks/tasks.routes');
+const schedulerRoutes = require('../../modules/scheduler/scheduler.routes');
+const checkinsRoutes = require('../../modules/checkins/checkins.routes');
+const masteryRoutes = require('../../modules/mastery/mastery.routes');
+const quizzesRoutes = require('../../modules/quizzes/quizzes.routes');
+const companionChatRoutes = require('../../modules/chat/chat.routes');
+const calendarRoutes = require('../../modules/calendar/calendar.routes');
+const notificationsRoutes = require('../../modules/notifications/notifications.routes');
+const achievementsRoutes = require('../../modules/gamification/achievements.routes');
+const levelRoutes = require('../../modules/gamification/level.routes');
+const mentorsRoutes = require('../../modules/mentors/mentors.routes');
+const adminRoutes = require('../../modules/admin/admin.routes');
+
+const router = express.Router();
+
+router.use('/', healthRoutes);
+router.use('/auth', authRoutes);
+router.use('/users/profile', profileRoutes);
+router.use('/subjects', subjectsRoutes);
+router.use('/goals', goalsRoutes);
+router.use('/ai/planning', aiPlanningRoutes);
+router.use('/planner', aiPlanningRoutes);
+router.use('/planner', streamRoutes);
+router.use('/tasks', tasksRoutes);
+router.use('/scheduler', schedulerRoutes);
+router.use('/check-ins', checkinsRoutes);
+router.use('/mastery', masteryRoutes);
+router.use('/quizzes', quizzesRoutes);
+router.use('/chat', companionChatRoutes);
+router.use('/calendar', calendarRoutes);
+router.use('/notifications', notificationsRoutes);
+router.use('/achievements', achievementsRoutes);
+router.use('/level', levelRoutes);
+router.use('/mentors', mentorsRoutes);
+router.use('/admin', adminRoutes);
+
+module.exports = router;

@@ -1,0 +1,31 @@
+name: Project Build & Test Validation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Root Dependencies
+        run: npm ci
+
+      - name: Verify Backend JavaScript Syntax
+        run: |
+          find server/src -name "*.js" | xargs -I {} node -c {}
+
+      - name: Build Frontend Application
+        run: |
+          npm run build --workspace=client

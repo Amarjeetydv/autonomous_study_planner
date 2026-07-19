@@ -1,0 +1,110 @@
+openapi: 3.0.3
+info:
+  title: Autonomous Study Planner Goals API
+  version: 1.0.0
+paths:
+  /api/v1/goals:
+    get:
+      summary: List goals
+      responses:
+        '200':
+          description: Goals fetched successfully
+    post:
+      summary: Create goal
+      responses:
+        '201':
+          description: Goal created successfully
+  /api/v1/goals/{goalId}:
+    get:
+      summary: Get goal by id
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Goal fetched successfully
+    patch:
+      summary: Update goal
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Goal updated successfully
+    delete:
+      summary: Delete goal
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Goal deleted successfully
+  /api/v1/goals/{goalId}/pause:
+    post:
+      summary: Pause goal
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Goal paused successfully
+  /api/v1/goals/{goalId}/resume:
+    post:
+      summary: Resume goal
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Goal resumed successfully
+  /api/v1/goals/{goalId}/archive:
+    post:
+      summary: Archive goal
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Goal archived successfully
+  /api/v1/goals/{goalId}/complete:
+    post:
+      summary: Complete goal
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Goal completed successfully
+  /api/v1/goals/{goalId}/duplicate:
+    post:
+      summary: Duplicate goal
+      parameters:
+        - in: path
+          name: goalId
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Goal duplicated successfully
