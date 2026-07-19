@@ -2,9 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Award, AlertTriangle, HelpCircle, 
-  Sparkles, Clock, Loader2
+  Sparkles, Clock
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
+import { QuizSkeleton } from '../../components/ui/Skeleton';
 
 interface Subject {
   _id: string;
@@ -44,7 +45,8 @@ export default function KnowledgeMastery() {
     queryFn: async () => {
       const response = await apiClient.get('/mastery');
       return response.data.data.masteries as MasteryRecord[];
-    }
+    },
+    staleTime: 1000 * 60 * 3,
   });
 
   // Fetch weak topics list
@@ -53,7 +55,8 @@ export default function KnowledgeMastery() {
     queryFn: async () => {
       const response = await apiClient.get('/mastery/weak-topics');
       return response.data.data.weakTopics as MasteryRecord[];
-    }
+    },
+    staleTime: 1000 * 60 * 3,
   });
 
   // Fetch upcoming revision queue
@@ -62,16 +65,12 @@ export default function KnowledgeMastery() {
     queryFn: async () => {
       const response = await apiClient.get('/mastery/revision-queue');
       return response.data.data.queue as MasteryRecord[];
-    }
+    },
+    staleTime: 1000 * 60 * 3,
   });
 
   if (isLoading || !masteries) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-brand-500" />
-        <p className="text-sm">Retrieving academic mastery parameters...</p>
-      </div>
-    );
+    return <QuizSkeleton />;
   }
 
   // Filter subject mastery records (records without subtopics/topics represent general subject logs)

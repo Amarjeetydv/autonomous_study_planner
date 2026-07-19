@@ -3,6 +3,7 @@ import { useEffect, lazy, Suspense } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { checkAuth, logout } from './features/auth/authSlice';
 import { RootState, AppDispatch } from './app/store';
+import ToastContainer from './components/ui/ToastContainer';
 
 // Lazy load all pages
 const Login = lazy(() => import('./pages/auth/Login'));
@@ -208,6 +209,7 @@ export default function App() {
       {/* Fallback Redirect */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    <ToastContainer />
     </Suspense>
   );
 }

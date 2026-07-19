@@ -6,9 +6,10 @@ import {
   BarElement, Title, Tooltip, Legend, Filler 
 } from 'chart.js';
 import { 
-  ArrowLeft, Calendar, Clock, Award, Flame, Smile, Target, Sparkles, Loader2 
+  ArrowLeft, Calendar, Clock, Award, Flame, Smile, Target, Sparkles 
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
+import { AnalyticsSkeleton } from '../../components/ui/Skeleton';
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement, BarElement, 
@@ -54,7 +55,8 @@ export default function Analytics() {
     queryFn: async () => {
       const response = await apiClient.get('/check-ins/analytics');
       return response.data.data.analytics as AnalyticsData;
-    }
+    },
+    staleTime: 1000 * 60 * 3,
   });
 
   // Fetch streak info
@@ -63,16 +65,12 @@ export default function Analytics() {
     queryFn: async () => {
       const response = await apiClient.get('/check-ins/streak');
       return response.data.data.streak;
-    }
+    },
+    staleTime: 1000 * 60 * 3,
   });
 
   if (isLoading || !analytics) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-brand-500" />
-        <p className="text-sm">Calculating study statistics & drawing trends...</p>
-      </div>
-    );
+    return <AnalyticsSkeleton />;
   }
 
   const history = analytics.rawHistory || [];

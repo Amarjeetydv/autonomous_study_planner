@@ -6,6 +6,8 @@ import {
   RefreshCw, CheckCircle, X, Loader2 
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
+import { CalendarSkeleton } from '../../components/ui/Skeleton';
+import { toast } from '../../services/toast';
 
 interface Recurrence {
   frequency?: string;
@@ -46,7 +48,8 @@ export default function CalendarDashboard() {
     queryFn: async () => {
       const response = await apiClient.get('/calendar');
       return response.data.data.events as CalendarEvent[];
-    }
+    },
+    staleTime: 1000 * 60 * 3,
   });
 
   // Create custom event mutation
@@ -62,6 +65,7 @@ export default function CalendarDashboard() {
       setEventType('custom');
       setEventStart('');
       setEventEnd('');
+      toast.success('Calendar event added successfully!');
       queryClient.invalidateQueries({ queryKey: ['calendarEventsList'] });
     }
   });
@@ -73,6 +77,7 @@ export default function CalendarDashboard() {
       return response.data.data.syncResults;
     },
     onSuccess: () => {
+      toast.success('Calendar synchronized with Google Calendar!', '🗓️ Sync Completed');
       setShowSyncToast(true);
       setTimeout(() => setShowSyncToast(false), 4000);
     }
@@ -245,10 +250,7 @@ export default function CalendarDashboard() {
 
         {/* Grid Cells */}
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center text-slate-500 py-20 gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-brand-500" />
-            <span className="text-xs">Synchronizing active study calendar sessions...</span>
-          </div>
+          <CalendarSkeleton />
         ) : (
           <div className="grid grid-cols-7 gap-px bg-slate-900 border border-slate-900 rounded-2xl overflow-hidden">
             {/* Week Headers */}

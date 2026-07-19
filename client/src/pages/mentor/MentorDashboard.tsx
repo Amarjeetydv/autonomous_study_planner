@@ -4,6 +4,8 @@ import {
   Users, Search, Star, ArrowLeft, Loader2, Target 
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
+import { MentorSkeleton } from '../../components/ui/Skeleton';
+import { toast } from '../../services/toast';
 
 interface StudentLink {
   studentId: {
@@ -71,6 +73,7 @@ export default function MentorDashboard() {
       return response.data.data.feedback;
     },
     onSuccess: () => {
+      toast.success('Feedback submitted to student successfully!', '💬 Feedback Sent');
       queryClient.invalidateQueries({ queryKey: ['mentorStudentDetails', selectedStudentId] });
       setFeedbackComment('');
       setFeedbackRating(5);
@@ -96,12 +99,7 @@ export default function MentorDashboard() {
   ) || [];
 
   if (isStudentsLoading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-brand-500" />
-        <p className="text-sm">Accessing mentor portal & student links...</p>
-      </div>
-    );
+    return <MentorSkeleton />;
   }
 
   // Detail Sub-view Panel

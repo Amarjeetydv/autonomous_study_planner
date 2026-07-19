@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle2, XCircle, Loader2, Mail } from 'lucide-react';
 import apiClient from '../../services/api/client';
+import { toast } from '../../services/toast';
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -28,7 +30,12 @@ export default function VerifyEmail() {
     const verifyToken = async () => {
       try {
         const response = await apiClient.post('/auth/verify-email', { token });
-        setSuccess(response.data.message || 'Email verified successfully! You can now log in.');
+        const msg = response.data.message || 'Email verified successfully! You can now log in.';
+        setSuccess(msg);
+        toast.success('Account verified! Redirecting to login...', '🎉 Email Verified');
+        setTimeout(() => {
+          navigate('/login');
+        }, 3000);
       } catch (err: any) {
         const msg = err.response?.data?.message || 'Verification token is invalid or has expired.';
         setError(msg);
@@ -41,7 +48,7 @@ export default function VerifyEmail() {
     };
 
     verifyToken();
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
   const handleResend = async (e: React.FormEvent) => {
     e.preventDefault();

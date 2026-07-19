@@ -5,6 +5,7 @@ import { User as UserIcon, Mail, Lock, Shield, Loader2, CheckCircle2 } from 'luc
 import { registerUser, clearError } from '../../features/auth/authSlice';
 import { RootState, AppDispatch } from '../../app/store';
 import apiClient from '../../services/api/client';
+import { toast } from '../../services/toast';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -69,15 +70,30 @@ export default function Register() {
     }
   };
 
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
   const handleResendVerification = async () => {
+    if (resendCooldown > 0 || resendLoading) return;
     setResendLoading(true);
     setResendSuccess('');
     setResendError('');
     try {
       const response = await apiClient.post('/auth/resend-verification', { email });
       setResendSuccess(response.data.message || 'Verification email resent successfully!');
+      toast.success('Verification email sent to ' + email, '📧 Email Sent');
+      setResendCooldown(30);
     } catch (err: any) {
-      setResendError(err.response?.data?.message || 'Failed to resend verification email.');
+      const errorMsg = err.response?.data?.message || 'Failed to resend verification email.';
+      setResendError(errorMsg);
+      toast.error(errorMsg, 'Resend Failed');
     } finally {
       setResendLoading(false);
     }
@@ -89,12 +105,18 @@ export default function Register() {
         {/* Glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-brand-500/10 blur-[120px] pointer-events-none"></div>
         <div className="w-full max-w-md z-10 glass-panel p-8 rounded-2xl text-center shadow-xl border border-slate-800">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-500/10 text-brand-400 mb-6">
-            <CheckCircle2 className="h-6 w-6" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 mb-6">
+            <CheckCircle2 className="h-8 w-8" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Check your email</h2>
-          <p className="text-slate-400 text-sm mb-6">
-            {successMessage || 'Registration successful. Please check your email and verify your account before logging in.'}
+          <h2 className="text-2xl font-bold text-white mb-2">✅ Account Created Successfully</h2>
+          <p className="text-slate-300 text-sm mb-2">
+            We have sent a verification email to:
+          </p>
+          <p className="text-brand-400 font-semibold text-sm mb-4 bg-brand-500/10 py-1.5 px-3 rounded-lg inline-block border border-brand-500/20">
+            {email}
+          </p>
+          <p className="text-slate-400 text-xs mb-6">
+            {successMessage || 'Please verify your email before logging in.'}
           </p>
 
           {resendSuccess && (
@@ -117,9 +139,10 @@ export default function Register() {
               Go to Login
             </Link>
 
+            <div className="text-xs text-slate-400 mt-2">Didn't receive the email?</div>
             <button
               onClick={handleResendVerification}
-              disabled={resendLoading}
+              disabled={resendLoading || resendCooldown > 0}
               className="inline-flex w-full justify-center items-center gap-2 rounded-xl bg-slate-900 text-slate-300 border border-slate-800 px-4 py-3 text-sm font-semibold shadow transition hover:bg-slate-800 disabled:opacity-50"
             >
               {resendLoading ? (
@@ -127,8 +150,10 @@ export default function Register() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Resending...
                 </>
+              ) : resendCooldown > 0 ? (
+                `Resend Verification (${resendCooldown}s)`
               ) : (
-                'Resend Verification Email'
+                'Resend Verification'
               )}
             </button>
           </div>

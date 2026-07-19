@@ -6,6 +6,7 @@ import {
   Plus, Eye, Loader2, Sparkles, Bell, Users
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
+import { toast } from '../../services/toast';
 import DailyCheckInModal from '../../components/student/DailyCheckInModal';
 import NotificationDrawer from '../../components/student/NotificationDrawer';
 
@@ -47,7 +48,8 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await apiClient.get('/goals?status=active&limit=1');
       return response.data.data.items?.[0] || null;
-    }
+    },
+    staleTime: 1000 * 60 * 2,
   });
 
   // Fetch user profile
@@ -56,7 +58,8 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await apiClient.get('/auth/me');
       return response.data.data.user;
-    }
+    },
+    staleTime: 1000 * 60 * 5,
   });
 
   const studentId = profileData?.id || profileData?._id;
@@ -69,7 +72,8 @@ export default function Dashboard() {
       const response = await apiClient.get(`/mentors/feedback/${studentId}`);
       return response.data.data.feedback;
     },
-    enabled: !!studentId
+    enabled: !!studentId,
+    staleTime: 1000 * 60 * 2,
   });
 
   // Connect mentor mutation
@@ -78,11 +82,11 @@ export default function Dashboard() {
       await apiClient.post('/mentors/request', { mentorId });
     },
     onSuccess: () => {
-      alert('Mentor link request sent successfully!');
+      toast.success('Mentor link request sent successfully!', 'Request Sent');
       setMentorInputId('');
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || 'Failed to send request');
+      toast.error(err.response?.data?.message || 'Failed to send mentor request', 'Request Failed');
     }
   });
 
@@ -131,13 +135,14 @@ export default function Dashboard() {
     }
   });
 
-  // Fetch subjects list for select launcher
+  // Fetch subjects list for select launcher (Cached for 10 minutes)
   const { data: subjectsList } = useQuery({
     queryKey: ['subjectsListForQuiz'],
     queryFn: async () => {
       const response = await apiClient.get('/subjects?limit=100');
       return response.data.data.items;
-    }
+    },
+    staleTime: 1000 * 60 * 10,
   });
 
   // Generate quiz mutation

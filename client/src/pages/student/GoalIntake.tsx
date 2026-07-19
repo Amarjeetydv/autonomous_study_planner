@@ -5,6 +5,7 @@ import {
   ArrowLeft, ArrowRight, Check, Loader2, AlertCircle
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
+import { toast } from '../../services/toast';
 
 interface Subject {
   id: string;
@@ -130,6 +131,7 @@ export default function GoalIntake() {
   // Submit mutation
   const submitMutation = useMutation({
     mutationFn: async (payload: any) => {
+      toast.info('Generating AI Study Plan...', '🤖 AI Agents Activated');
       const res = await apiClient.post('/goals', payload);
       const goal = res.data.data.goal;
       const goalId = goal.id || goal._id;
@@ -139,10 +141,13 @@ export default function GoalIntake() {
     },
     onSuccess: (data) => {
       localStorage.removeItem('asp_goal_intake_draft');
+      toast.success('Study Goal Created! Launching Multi-Agent Pipeline...', '🎉 Goal Created');
       navigate(`/planner/job/${data.jobId}`);
     },
     onError: (err: any) => {
-      setFormError(err.response?.data?.message || 'Failed to submit study goal. Please try again.');
+      const msg = err.response?.data?.message || 'Failed to submit study goal. Please try again.';
+      setFormError(msg);
+      toast.error(msg, 'Generation Error');
     }
   });
 
