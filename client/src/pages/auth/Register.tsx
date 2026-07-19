@@ -94,7 +94,7 @@ export default function Register() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Check your email</h2>
           <p className="text-slate-400 text-sm mb-6">
-            Registration successful. Please check your email and verify your account before logging in.
+            {successMessage || 'Registration successful. Please check your email and verify your account before logging in.'}
           </p>
 
           {resendSuccess && (

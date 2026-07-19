@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle2, Circle, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { API_BASE_URL } from '../../services/api/client';
 
 interface StageState {
   id: string;
@@ -35,10 +36,9 @@ export default function PlanningLoader() {
 
     // Retrieve token for SSE query parameter auth fallback
     const token = localStorage.getItem('asp_access_token') || '';
-    const baseUrl = import.meta.env.VITE_API_URL || '';
-    
+
     // Construct stream URL
-    const streamUrl = `${baseUrl}/planner/job/${jobId}/stream?token=${encodeURIComponent(token)}`;
+    const streamUrl = `${API_BASE_URL}/planner/job/${jobId}/stream?token=${encodeURIComponent(token)}`;
     const eventSource = new EventSource(streamUrl);
 
     // Track elapsed time

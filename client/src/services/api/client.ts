@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+const rawBaseUrl =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'http://localhost:5000/api/v1';
+
+export const API_BASE_URL = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+
 const apiClient = axios.create({
-  baseURL: '/api/v1',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -37,7 +44,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry && !isPublicRoute) {
       originalRequest._retry = true;
       try {
-        const response = await axios.post('/api/v1/auth/refresh-token', {}, { withCredentials: true });
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {}, { withCredentials: true });
         const { accessToken } = response.data.data;
         
         localStorage.setItem('asp_access_token', accessToken);
@@ -55,3 +62,4 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
