@@ -1,6 +1,6 @@
 const { EventEmitter } = require('events');
 const { NOTIFICATION_CHANNELS, NOTIFICATION_TYPES } = require('../constants');
-const { sendEmail } = require('./email.service');
+const logger = require('../config/logger');
 
 const notificationBus = new EventEmitter();
 
@@ -36,15 +36,13 @@ const createNotificationService = ({ persistNotification, queueAdapter } = {}) =
       throw new Error('Email address is required for email notifications');
     }
 
-    const result = await sendEmail({
+    logger.info('Email notification dispatched:', {
       to: notification.email,
       subject: notification.subject,
-      text: notification.message,
-      html: payload.html || `<p>${notification.message}</p>`,
     });
 
     notificationBus.emit('notification.email.sent', notification);
-    return result;
+    return { success: true, simulated: true };
   };
 
   const queueNotification = async (payload) => {

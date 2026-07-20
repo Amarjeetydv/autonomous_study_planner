@@ -4,13 +4,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import { checkAuth, logout } from './features/auth/authSlice';
 import { RootState, AppDispatch } from './app/store';
 import ToastContainer from './components/ui/ToastContainer';
+import AuthenticatedLayout from './components/layout/AuthenticatedLayout';
+import { toast } from './services/toast';
 
 // Lazy load all pages
 const Login = lazy(() => import('./pages/auth/Login'));
 const Register = lazy(() => import('./pages/auth/Register'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
-const VerifyEmail = lazy(() => import('./pages/auth/VerifyEmail'));
 const GoalIntake = lazy(() => import('./pages/student/GoalIntake'));
 const PlanningLoader = lazy(() => import('./pages/student/PlanningLoader'));
 const StudyPlanViewer = lazy(() => import('./pages/student/StudyPlanViewer'));
@@ -49,10 +50,8 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
     return <Navigate to="/unauthorized" replace />;
   }
 
-  return <>{children}</>;
+  return <AuthenticatedLayout>{children}</AuthenticatedLayout>;
 }
-
-
 
 export default function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -62,6 +61,7 @@ export default function App() {
 
     const handleLogout = () => {
       dispatch(logout());
+      toast.info('Your session has expired. Please log in again.', 'Session Expired');
     };
     window.addEventListener('asp_logout', handleLogout);
     return () => window.removeEventListener('asp_logout', handleLogout);
@@ -82,7 +82,6 @@ export default function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
 
       {/* Protected Routes */}
       <Route

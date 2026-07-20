@@ -15,21 +15,11 @@ const env = {
   auth: {
     accessTokenSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret_change_me',
     refreshTokenSecret: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret_change_me',
-    emailVerificationSecret: process.env.JWT_EMAIL_VERIFICATION_SECRET || 'dev_email_verification_secret_change_me',
     passwordResetSecret: process.env.JWT_PASSWORD_RESET_SECRET || 'dev_password_reset_secret_change_me',
     accessTokenExpiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN || '15m',
     refreshTokenExpiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRES_IN || '7d',
-    emailVerificationExpiresIn: process.env.EMAIL_VERIFICATION_EXPIRES_IN || '24h',
     passwordResetExpiresIn: process.env.PASSWORD_RESET_TOKEN_EXPIRES_IN || '1h',
     refreshCookieName: process.env.REFRESH_TOKEN_COOKIE_NAME || 'asp_refresh_token',
-  },
-  smtp: {
-    host: process.env.SMTP_HOST || '',
-    port: Number(process.env.SMTP_PORT || 0),
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
-    from: process.env.SMTP_FROM_EMAIL || 'no-reply@autonomousstudyplanner.local',
-    secure: process.env.SMTP_SECURE === 'true',
   },
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',

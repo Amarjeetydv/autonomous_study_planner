@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, Award, AlertTriangle, HelpCircle, 
+  Award, AlertTriangle, HelpCircle, 
   Sparkles, Clock
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
@@ -37,14 +36,13 @@ interface MasteryRecord {
 }
 
 export default function KnowledgeMastery() {
-  const navigate = useNavigate();
 
   // Fetch list of all mastery progress logs
   const { data: masteries, isLoading } = useQuery({
     queryKey: ['masteriesData'],
     queryFn: async () => {
       const response = await apiClient.get('/mastery');
-      return response.data.data.masteries as MasteryRecord[];
+      return (response.data?.data?.masteries || []) as MasteryRecord[];
     },
     staleTime: 1000 * 60 * 3,
   });
@@ -54,7 +52,7 @@ export default function KnowledgeMastery() {
     queryKey: ['weakTopicsData'],
     queryFn: async () => {
       const response = await apiClient.get('/mastery/weak-topics');
-      return response.data.data.weakTopics as MasteryRecord[];
+      return (response.data?.data?.weakTopics || []) as MasteryRecord[];
     },
     staleTime: 1000 * 60 * 3,
   });
@@ -64,40 +62,34 @@ export default function KnowledgeMastery() {
     queryKey: ['revisionQueueData'],
     queryFn: async () => {
       const response = await apiClient.get('/mastery/revision-queue');
-      return response.data.data.queue as MasteryRecord[];
+      return (response.data?.data?.queue || []) as MasteryRecord[];
     },
     staleTime: 1000 * 60 * 3,
   });
 
-  if (isLoading || !masteries) {
+  if (isLoading) {
     return <QuizSkeleton />;
   }
 
-  // Filter subject mastery records (records without subtopics/topics represent general subject logs)
-  const subjectRecords = masteries.filter(m => m.subjectId && !m.topicId);
-  const topicRecords = masteries.filter(m => m.topicId);
+  const safeMasteries = masteries || [];
+
+  // Filter subject mastery records
+  const subjectRecords = safeMasteries.filter(m => m.subjectId && !m.topicId);
+  const topicRecords = safeMasteries.filter(m => m.topicId);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Lights */}
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-brand-500/5 blur-[120px] pointer-events-none"></div>
 
       <div className="max-w-6xl mx-auto space-y-8 z-10 relative">
-        {/* Header bar */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="p-3 rounded-xl border border-slate-900 bg-slate-900/40 text-slate-400 hover:text-white transition"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
-              <Award className="h-6 w-6 text-brand-400" />
-              Academic Mastery Hub
-            </h1>
-            <p className="text-slate-400 text-xs mt-1">Continuous spaced repetition tracking and active recall metrics logs.</p>
-          </div>
+        {/* Title block */}
+        <div>
+          <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
+            <Award className="h-6 w-6 text-brand-400" />
+            Academic Mastery Hub
+          </h1>
+          <p className="text-slate-400 text-xs mt-1">Continuous spaced repetition tracking and active recall metrics logs.</p>
         </div>
 
         {/* 1. Subject Mastery Cards grid */}

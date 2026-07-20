@@ -151,13 +151,7 @@ export default function AICompanion() {
       {/* Sidebar Thread List */}
       <div className="w-80 border-r border-slate-900/60 bg-slate-950/40 flex flex-col justify-between z-10 shrink-0 hidden md:flex">
         <div className="p-5 border-b border-slate-900 flex justify-between items-center">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Workspace
-          </button>
+          <span className="text-xs font-bold text-slate-300">Chat History</span>
           <button
             onClick={startNewSession}
             className="flex items-center gap-1 bg-brand-500/10 text-brand-400 border border-brand-500/20 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-500/20 transition"

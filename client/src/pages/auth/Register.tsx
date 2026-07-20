@@ -4,8 +4,6 @@ import { Link } from 'react-router-dom';
 import { User as UserIcon, Mail, Lock, Shield, Loader2, CheckCircle2 } from 'lucide-react';
 import { registerUser, clearError } from '../../features/auth/authSlice';
 import { RootState, AppDispatch } from '../../app/store';
-import apiClient from '../../services/api/client';
-import { toast } from '../../services/toast';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -16,9 +14,6 @@ export default function Register() {
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [resendSuccess, setResendSuccess] = useState('');
-  const [resendError, setResendError] = useState('');
 
   const dispatch = useDispatch<AppDispatch>();
   const { isLoading, error } = useSelector((state: RootState) => state.auth);
@@ -65,37 +60,8 @@ export default function Register() {
 
     const resultAction = await dispatch(registerUser({ name, email, password, confirmPassword, role }));
     if (registerUser.fulfilled.match(resultAction)) {
-      setSuccessMessage(resultAction.payload || 'Registration successful! Please check your email.');
+      setSuccessMessage(resultAction.payload || 'Registration successful. Please log in.');
       setIsSubmitted(true);
-    }
-  };
-
-  const [resendCooldown, setResendCooldown] = useState(0);
-
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const timer = setInterval(() => {
-      setResendCooldown((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [resendCooldown]);
-
-  const handleResendVerification = async () => {
-    if (resendCooldown > 0 || resendLoading) return;
-    setResendLoading(true);
-    setResendSuccess('');
-    setResendError('');
-    try {
-      const response = await apiClient.post('/auth/resend-verification', { email });
-      setResendSuccess(response.data.message || 'Verification email resent successfully!');
-      toast.success('Verification email sent to ' + email, '📧 Email Sent');
-      setResendCooldown(30);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || 'Failed to resend verification email.';
-      setResendError(errorMsg);
-      toast.error(errorMsg, 'Resend Failed');
-    } finally {
-      setResendLoading(false);
     }
   };
 
@@ -108,28 +74,10 @@ export default function Register() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 mb-6">
             <CheckCircle2 className="h-8 w-8" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">✅ Account Created Successfully</h2>
-          <p className="text-slate-300 text-sm mb-2">
-            We have sent a verification email to:
+          <h2 className="text-2xl font-bold text-white mb-2">Account Created Successfully</h2>
+          <p className="text-slate-300 text-sm mb-6">
+            {successMessage || 'Registration successful. Please log in.'}
           </p>
-          <p className="text-brand-400 font-semibold text-sm mb-4 bg-brand-500/10 py-1.5 px-3 rounded-lg inline-block border border-brand-500/20">
-            {email}
-          </p>
-          <p className="text-slate-400 text-xs mb-6">
-            {successMessage || 'Please verify your email before logging in.'}
-          </p>
-
-          {resendSuccess && (
-            <div className="mb-4 rounded-lg bg-emerald-950/40 border border-emerald-500/30 p-3 text-sm text-emerald-400 text-left">
-              {resendSuccess}
-            </div>
-          )}
-
-          {resendError && (
-            <div className="mb-4 rounded-lg bg-red-950/40 border border-red-500/30 p-3 text-sm text-red-400 text-left">
-              {resendError}
-            </div>
-          )}
 
           <div className="flex flex-col gap-3">
             <Link
@@ -138,24 +86,6 @@ export default function Register() {
             >
               Go to Login
             </Link>
-
-            <div className="text-xs text-slate-400 mt-2">Didn't receive the email?</div>
-            <button
-              onClick={handleResendVerification}
-              disabled={resendLoading || resendCooldown > 0}
-              className="inline-flex w-full justify-center items-center gap-2 rounded-xl bg-slate-900 text-slate-300 border border-slate-800 px-4 py-3 text-sm font-semibold shadow transition hover:bg-slate-800 disabled:opacity-50"
-            >
-              {resendLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Resending...
-                </>
-              ) : resendCooldown > 0 ? (
-                `Resend Verification (${resendCooldown}s)`
-              ) : (
-                'Resend Verification'
-              )}
-            </button>
           </div>
         </div>
       </div>

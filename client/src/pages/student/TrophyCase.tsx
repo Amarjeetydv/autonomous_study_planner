@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { 
-  Award, ArrowLeft, Shield, Flame, BookOpen, RefreshCw, 
+  Award, Shield, Flame, BookOpen, RefreshCw, 
   CheckCircle, CheckCircle2, Lock, Loader2 
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
@@ -37,7 +36,6 @@ interface UserLevel {
 }
 
 export default function TrophyCase() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [filterType, setFilterType] = useState<'All' | 'Unlocked' | 'Locked'>('All');
 
@@ -46,7 +44,7 @@ export default function TrophyCase() {
     queryKey: ['achievementDefinitionsList'],
     queryFn: async () => {
       const response = await apiClient.get('/achievements');
-      return response.data.data.achievements as AchievementDef[];
+      return (response.data?.data?.achievements || []) as AchievementDef[];
     }
   });
 
@@ -55,7 +53,7 @@ export default function TrophyCase() {
     queryKey: ['userAchievementsProgress'],
     queryFn: async () => {
       const response = await apiClient.get('/achievements/unlocked');
-      return response.data.data.achievements as UserAchievement[];
+      return (response.data?.data?.achievements || []) as UserAchievement[];
     }
   });
 
@@ -64,15 +62,15 @@ export default function TrophyCase() {
     queryKey: ['userLevelDetails'],
     queryFn: async () => {
       const response = await apiClient.get('/level');
-      return response.data.data.level as UserLevel;
+      return (response.data?.data?.level || { currentLevel: 1, totalXP: 0, currentXP: 0, nextLevelXP: 100 }) as UserLevel;
     }
   });
 
   // Recalculate level mutation
   const recalculateMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiClient.post('/level/recalculate');
-      return response.data.data.level;
+      const response = await apiClient.get('/level');
+      return response.data?.data?.level;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userLevelDetails'] });
@@ -80,7 +78,7 @@ export default function TrophyCase() {
     }
   });
 
-  if (isDefsLoading || isUserAchsLoading || isLevelLoading || !userLevel || !allDefs) {
+  if (isDefsLoading || isUserAchsLoading || isLevelLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-brand-500" />
@@ -89,8 +87,11 @@ export default function TrophyCase() {
     );
   }
 
+  const safeDefs = allDefs || [];
+  const safeLevel = userLevel || { currentLevel: 1, totalXP: 0, currentXP: 0, nextLevelXP: 100 };
+
   // Compile achievements with user progress
-  const achievements = allDefs.map(def => {
+  const achievements = safeDefs.map(def => {
     const userAch = userAchs?.find(ua => ua.achievementId?._id === def._id);
     return {
       definition: def,
@@ -119,7 +120,7 @@ export default function TrophyCase() {
     }
   };
 
-  const xpPercent = Math.min(100, Math.round((userLevel.currentXP / userLevel.nextLevelXP) * 100));
+  const xpPercent = Math.min(100, Math.round((safeLevel.currentXP / (safeLevel.nextLevelXP || 100)) * 100));
 
   const filteredAchs = achievements.filter(ach => {
     if (filterType === 'Unlocked') return !!ach.unlockedAt;
@@ -128,27 +129,19 @@ export default function TrophyCase() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 text-slate-100 py-8 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Lights */}
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-brand-500/5 blur-[120px] pointer-events-none"></div>
 
       <div className="max-w-5xl mx-auto space-y-8 z-10 relative">
-        {/* Header bar */}
+        {/* Title block */}
         <div className="flex items-center justify-between border-b border-slate-900 pb-5">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="p-3 rounded-xl border border-slate-900 bg-slate-900/40 text-slate-400 hover:text-white transition"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <div>
-              <h1 className="text-xl font-extrabold text-white flex items-center gap-2">
-                <Award className="h-5 w-5 text-brand-400" />
-                Trophy Case & Badges
-              </h1>
-              <p className="text-slate-400 text-xs mt-1">Unlock rewards by logging streaks, quiz scores, and daily revisions.</p>
-            </div>
+          <div>
+            <h1 className="text-xl font-extrabold text-white flex items-center gap-2">
+              <Award className="h-5 w-5 text-brand-400" />
+              Trophy Case & Badges
+            </h1>
+            <p className="text-slate-400 text-xs mt-1">Unlock rewards by logging streaks, quiz scores, and daily revisions.</p>
           </div>
 
           <button
@@ -171,9 +164,9 @@ export default function TrophyCase() {
             <div className="flex justify-between items-end">
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-500 block">Current rank</span>
-                <h2 className="text-lg font-extrabold text-white">Level {userLevel.currentLevel} Scholar</h2>
+                <h2 className="text-lg font-extrabold text-white">Level {safeLevel.currentLevel} Scholar</h2>
               </div>
-              <span className="text-xs font-bold text-slate-400">{userLevel.currentXP} / {userLevel.nextLevelXP} XP</span>
+              <span className="text-xs font-bold text-slate-400">{safeLevel.currentXP} / {safeLevel.nextLevelXP} XP</span>
             </div>
 
             <div className="w-full h-3 bg-slate-950 border border-slate-900 rounded-full overflow-hidden">

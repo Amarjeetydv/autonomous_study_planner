@@ -261,42 +261,35 @@ export default function Dashboard() {
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-brand-500/5 blur-[120px] pointer-events-none"></div>
 
       <div className="max-w-6xl mx-auto space-y-8 z-10 relative">
-        {/* Header Widget */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {/* Page Title & Action Bar */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-slate-900/60">
           <div>
             <span className="text-[10px] tracking-widest text-brand-400 font-bold uppercase block">Student Workspace</span>
-            <h1 className="text-3xl font-extrabold text-white">StudyPilot Dashboard</h1>
+            <h1 className="text-2xl font-extrabold text-white">Dashboard Overview</h1>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3">
+            {goalData ? (
+              <div className="glass-panel p-2.5 px-4 rounded-xl border border-slate-800 flex items-center gap-3">
+                <Target className="h-4 w-4 text-brand-400" />
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-slate-500 block leading-tight">Active Goal</span>
+                  <span className="text-xs font-semibold text-slate-200">{goalData.title}</span>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => navigate('/goals/new')}
+                className="flex items-center gap-2 bg-brand-500 text-white rounded-xl px-4 py-2.5 text-xs font-semibold hover:bg-brand-600 transition"
+              >
+                <Plus className="h-4 w-4" />
+                Setup Study Goal
+              </button>
+            )}
             <button
-              onClick={() => navigate('/companion')}
-              className="bg-brand-500 text-white rounded-xl px-4 py-2.5 text-xs font-bold hover:bg-brand-600 transition"
+              onClick={() => setShowCheckInModal(true)}
+              className="bg-brand-500 text-white rounded-xl px-4 py-2.5 text-xs font-bold hover:bg-brand-600 transition shadow-lg shadow-brand-500/20"
             >
-              AI Study Companion
-            </button>
-            <button
-              onClick={() => navigate('/mastery')}
-              className="bg-slate-900 border border-slate-800 text-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold hover:bg-slate-800 transition"
-            >
-              Knowledge Mastery
-            </button>
-            <button
-              onClick={() => navigate('/analytics')}
-              className="bg-slate-900 border border-slate-800 text-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold hover:bg-slate-800 transition"
-            >
-              View Analytics
-            </button>
-            <button
-              onClick={() => navigate('/calendar')}
-              className="bg-slate-900 border border-slate-800 text-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold hover:bg-slate-800 transition"
-            >
-              Study Calendar
-            </button>
-            <button
-              onClick={() => navigate('/trophy')}
-              className="bg-slate-900 border border-slate-800 text-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold hover:bg-slate-800 transition"
-            >
-              Trophy Case
+              Daily Check-In
             </button>
             <button
               onClick={() => setShowNotificationDrawer(true)}
@@ -309,23 +302,6 @@ export default function Dashboard() {
                 </span>
               )}
             </button>
-            {goalData ? (
-              <div className="glass-panel p-4 rounded-xl border border-slate-850 flex items-center gap-3">
-                <Target className="h-5 w-5 text-brand-400" />
-                <div>
-                  <span className="text-[9px] uppercase font-bold text-slate-500 block">Active Goal</span>
-                  <span className="text-xs font-semibold text-slate-200">{goalData.title}</span>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => navigate('/goals/new')}
-                className="flex items-center gap-2 bg-brand-500 text-white rounded-xl px-5 py-3 text-xs font-semibold hover:bg-brand-600 transition"
-              >
-                <Plus className="h-4 w-4" />
-                Setup Study Goal
-              </button>
-            )}
           </div>
         </div>
 

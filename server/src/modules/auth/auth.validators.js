@@ -38,19 +38,10 @@ const resetPasswordValidator = [
   body('confirmPassword').custom((value, { req }) => value === req.body.password).withMessage('Passwords do not match'),
 ];
 
-const verifyEmailValidator = [
-  body('token').optional().notEmpty().withMessage('Verification token is required'),
-  query('token').optional().notEmpty().withMessage('Verification token is required'),
-];
-
 const changePasswordValidator = [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   ...passwordRules,
   body('confirmPassword').custom((value, { req }) => value === req.body.password).withMessage('Passwords do not match'),
-];
-
-const resendVerificationValidator = [
-  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
 ];
 
 module.exports = {
@@ -58,7 +49,5 @@ module.exports = {
   loginValidator,
   forgotPasswordValidator,
   resetPasswordValidator,
-  verifyEmailValidator,
   changePasswordValidator,
-  resendVerificationValidator,
 };

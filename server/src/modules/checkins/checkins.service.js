@@ -106,10 +106,18 @@ const createCheckIn = async ({ userId, data }) => {
   }
 
   // Calculate Streak
-  let streak = await Streak.findOne({ studentId: userId });
-  if (!streak) {
-    streak = new Streak({ studentId: userId });
-  }
+  let streak = await Streak.findOneAndUpdate(
+    { studentId: userId },
+    {
+      $setOnInsert: {
+        currentStreak: 0,
+        longestStreak: 0,
+        totalStudyDays: 0,
+        weeklyDates: [],
+      },
+    },
+    { upsert: true, new: true }
+  );
 
   const todayStr = checkInDate.toDateString();
   const lastCheckInStr = streak.lastCheckInDate ? new Date(streak.lastCheckInDate).toDateString() : null;
@@ -165,11 +173,35 @@ const createCheckIn = async ({ userId, data }) => {
 };
 
 const getStreak = async (userId) => {
-  let streak = await Streak.findOne({ userId });
+  const streak = await Streak.findOne({ studentId: userId }).lean();
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayCheckIn = await DailyCheckIn.findOne({ userId, date: today }).lean();
+
   if (!streak) {
-    streak = await Streak.create({ studentId: userId });
+    return {
+      _id: null,
+      studentId: userId,
+      currentStreak: 0,
+      longestStreak: 0,
+      totalStudyDays: 0,
+      lastCheckInDate: null,
+      weeklyDates: [],
+      todayCompleted: !!todayCheckIn,
+    };
   }
-  return streak;
+
+  return {
+    _id: streak._id,
+    studentId: streak.studentId,
+    currentStreak: streak.currentStreak || 0,
+    longestStreak: streak.longestStreak || 0,
+    totalStudyDays: streak.totalStudyDays || 0,
+    lastCheckInDate: streak.lastCheckInDate || null,
+    weeklyDates: streak.weeklyDates || [],
+    todayCompleted: !!todayCheckIn,
+  };
 };
 
 const getHistory = async (userId) => {

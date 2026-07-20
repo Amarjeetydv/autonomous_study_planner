@@ -7,10 +7,11 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true, select: false },
     roles: { type: [String], enum: ['Student', 'Mentor', 'Admin'], default: ['Student'] },
     status: { type: String, enum: ['active', 'suspended', 'pendingVerification'], default: 'active' },
-    emailVerifiedAt: { type: Date, default: null },
-    isVerified: { type: Boolean, default: false },
+    emailVerifiedAt: { type: Date, default: () => new Date() },
+    isVerified: { type: Boolean, default: true },
     passwordChangedAt: { type: Date, default: null, select: false },
     refreshTokenHash: { type: String, select: false },
+    // DEPRECATED: Email verification feature removed
     emailVerificationToken: { type: String, select: false },
     emailVerificationExpires: { type: Date, select: false },
     passwordResetTokenHash: { type: String, select: false },

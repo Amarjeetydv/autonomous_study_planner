@@ -9,21 +9,12 @@ const {
   logout,
   forgotPassword,
   resetPassword,
-  verifyEmail,
-  resendVerification,
   changePassword,
   getCurrentUser,
 } = require('./auth.service');
 
 const registerController = asyncHandler(async (req, res) => {
-  console.log('\n=================== REGISTER START ===================');
-  console.time('REGISTER_TOTAL_CONTROLLER');
-
   const result = await register(req.body);
-
-  console.log('Step 8 - Return HTTP response');
-  console.timeEnd('REGISTER_TOTAL_CONTROLLER');
-  console.log('=================== REGISTER END ===================\n');
 
   return sendResponse(
     res,
@@ -124,22 +115,6 @@ const resetPasswordController = asyncHandler(async (req, res) => {
   );
 });
 
-const verifyEmailController = asyncHandler(async (req, res) => {
-  const token = req.body.token || req.query.token;
-  const result = await verifyEmail({ token });
-
-  return sendResponse(
-    res,
-    {
-      success: true,
-      message: result.message,
-      data: { user: result.user },
-      errors: [],
-    },
-    200
-  );
-});
-
 const changePasswordController = asyncHandler(async (req, res) => {
   const result = await changePassword({
     userId: req.user._id || req.user.id,
@@ -178,21 +153,6 @@ const getCurrentUserController = asyncHandler(async (req, res) => {
   );
 });
 
-const resendVerificationController = asyncHandler(async (req, res) => {
-  const result = await resendVerification({ email: req.body.email });
-
-  return sendResponse(
-    res,
-    {
-      success: true,
-      message: result.message,
-      data: null,
-      errors: [],
-    },
-    200
-  );
-});
-
 module.exports = {
   registerController,
   loginController,
@@ -200,8 +160,6 @@ module.exports = {
   logoutController,
   forgotPasswordController,
   resetPasswordController,
-  verifyEmailController,
-  resendVerificationController,
   changePasswordController,
   getCurrentUserController,
 };

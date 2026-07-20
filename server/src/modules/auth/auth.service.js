@@ -16,75 +16,117 @@ const {
   isTokenIssuedBeforePasswordChange,
   refreshTokenMatchesStoredHash,
 } = require('./auth.utils');
-const { sendVerificationEmail, sendPasswordResetEmail } = require('./auth.email');
 const { AUTH_ROLES } = require('./auth.constants');
 
 const SALT_ROUNDS = 12;
 
 const fetchAuthUserByEmail = (email) => User.findOne({ email }).select(TOKEN_SELECT_FIELDS);
-
 const fetchAuthUserById = (id) => User.findById(id).select(TOKEN_SELECT_FIELDS);
 
-const register = async ({ name, email, password, role }) => {
-  console.log('Step 1 - Request received');
-  console.log('Step 2 - Validate request');
+const mongoose = require('mongoose');
+const Streak = require('../../models/Streak');
 
-  console.log('Step 3 - Check existing user');
-  console.time('MONGODB_FIND_USER');
+const register = async ({ name, email, password, role }) => {
   const existingUser = await User.findOne({ email });
-  console.timeEnd('MONGODB_FIND_USER');
 
   if (existingUser) {
     throw new AppError('Email already registered', 409);
   }
 
-  console.log('Step 4 - Hash password');
-  console.time('BCRYPT_HASH');
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-  console.timeEnd('BCRYPT_HASH');
 
-  console.log('Step 5 - Generate verification token');
-  const emailVerificationToken = generateRandomToken();
+  let session = null;
+  let useTransaction = false;
 
-  console.log('Step 6 - Save user');
-  console.time('MONGODB_SAVE_USER');
-  const user = await User.create({
-    name,
-    email,
-    passwordHash,
-    roles: [role || AUTH_ROLES.STUDENT],
-    status: 'pendingVerification',
-    emailVerifiedAt: null,
-    isVerified: false,
-    emailVerificationToken: hashToken(emailVerificationToken),
-    emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
-  });
-  console.timeEnd('MONGODB_SAVE_USER');
+  try {
+    session = await mongoose.startSession();
+    // Enable transactions if MongoDB is connected to a replica set or mongos cluster
+    if (session && session.client && session.client.topology && session.client.topology.description.type !== 'Single') {
+      session.startTransaction();
+      useTransaction = true;
+    }
+  } catch (err) {
+    session = null;
+  }
 
-  console.log('Step 7 - Send verification email (Non-blocking background)');
-  console.time('EMAIL_SEND_TIME');
-  sendVerificationEmail(user, emailVerificationToken)
-    .then(() => {
-      console.timeEnd('EMAIL_SEND_TIME');
-      console.log('Email sent successfully.');
-    })
-    .catch((emailError) => {
-      console.timeEnd('EMAIL_SEND_TIME');
-      console.error('❌ Email dispatch failed:', {
-        message: emailError.message,
-        code: emailError.code,
-        command: emailError.command,
-        response: emailError.response,
-        responseCode: emailError.responseCode,
-        stack: emailError.stack,
+  let user = null;
+  let streak = null;
+
+  try {
+    if (useTransaction) {
+      const [newUser] = await User.create(
+        [
+          {
+            name,
+            email,
+            passwordHash,
+            roles: [role || AUTH_ROLES.STUDENT],
+            status: 'active',
+            emailVerifiedAt: new Date(),
+            isVerified: true,
+          },
+        ],
+        { session }
+      );
+      user = newUser;
+    } else {
+      user = await User.create({
+        name,
+        email,
+        passwordHash,
+        roles: [role || AUTH_ROLES.STUDENT],
+        status: 'active',
+        emailVerifiedAt: new Date(),
+        isVerified: true,
       });
-      const verificationUrl = `${env.auth.frontendUrl || env.frontendUrl || 'http://localhost:3000'}/verify-email?token=${encodeURIComponent(emailVerificationToken)}&email=${encodeURIComponent(user.email)}`;
-      logger.info(`[DEVELOPMENT ONLY] Email Verification Link: ${verificationUrl}`);
-    });
+    }
+
+    // Idempotent streak creation using findOneAndUpdate with $setOnInsert
+    const streakOptions = { upsert: true, new: true };
+    if (useTransaction) streakOptions.session = session;
+
+    streak = await Streak.findOneAndUpdate(
+      { studentId: user._id },
+      {
+        $setOnInsert: {
+          currentStreak: 0,
+          longestStreak: 0,
+          totalStudyDays: 0,
+          weeklyDates: [],
+        },
+      },
+      streakOptions
+    );
+
+    if (useTransaction) {
+      await session.commitTransaction();
+      session.endSession();
+    }
+  } catch (err) {
+    if (useTransaction && session) {
+      try {
+        await session.abortTransaction();
+        session.endSession();
+      } catch (abortErr) {}
+    }
+
+    // Fallback rollback cleanup for non-replica instances
+    if (user && user._id) {
+      await User.findByIdAndDelete(user._id).catch(() => {});
+      await Streak.deleteOne({ studentId: user._id }).catch(() => {});
+    }
+
+    logger.error('Registration failed during user & streak creation', { error: err.message });
+    throw new AppError('Registration failed. Please try again.', 500);
+  } finally {
+    if (session && !useTransaction) {
+      session.endSession();
+    }
+  }
 
   return {
     user: sanitizeUser(user),
-    message: 'Registration successful. Please check your email and verify your account before logging in.',
+    message: 'Registration successful. Please log in.',
   };
 };
 
@@ -103,10 +145,6 @@ const login = async ({ email, password }) => {
 
   if (user.status === 'suspended') {
     throw new AppError('Account is suspended', 403);
-  }
-
-  if (!user.isVerified) {
-    throw new AppError('Please verify your email before logging in.', 401);
   }
 
   const tokens = issueAuthTokens(user);
@@ -195,12 +233,7 @@ const forgotPassword = async ({ email }) => {
   user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
   await user.save();
 
-  sendPasswordResetEmail(user, resetToken).catch((emailError) => {
-    logger.error('Failed to send password reset email', {
-      email: user.email,
-      error: emailError.message,
-    });
-  });
+  logger.info('Password reset token generated:', { email: user.email, resetToken });
 
   return {
     message: 'If an account exists for that email, a password reset link has been sent.',
@@ -234,68 +267,6 @@ const resetPassword = async ({ email, token, password }) => {
     user: sanitizeUser(user),
     ...tokens,
     message: 'Password reset successfully',
-  };
-};
-
-const verifyEmail = async ({ token }) => {
-  if (!token) {
-    throw new AppError('Verification token is required', 400);
-  }
-
-  const tokenHash = hashToken(token);
-  const user = await User.findOne({
-    emailVerificationToken: tokenHash,
-    emailVerificationExpires: { $gt: new Date() },
-  }).select(TOKEN_SELECT_FIELDS);
-
-  if (!user) {
-    throw new AppError('Verification token is invalid or expired', 400);
-  }
-
-  user.isVerified = true;
-  user.emailVerifiedAt = new Date();
-  user.status = 'active';
-  user.emailVerificationToken = null;
-  user.emailVerificationExpires = null;
-  await user.save();
-
-  return {
-    user: sanitizeUser(user),
-    message: 'Email verified successfully.',
-  };
-};
-
-const resendVerification = async ({ email }) => {
-  if (!email) {
-    throw new AppError('Email is required', 400);
-  }
-
-  const user = await User.findOne({ email }).select(TOKEN_SELECT_FIELDS);
-
-  if (!user) {
-    throw new AppError('User not found', 404);
-  }
-
-  if (user.isVerified) {
-    throw new AppError('Email is already verified', 400);
-  }
-
-  const emailVerificationToken = generateRandomToken();
-  user.emailVerificationToken = hashToken(emailVerificationToken);
-  user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-  await user.save();
-
-  sendVerificationEmail(user, emailVerificationToken).catch((emailError) => {
-    const verificationUrl = `${env.auth.frontendUrl || env.frontendUrl || 'http://localhost:3000'}/verify-email?token=${encodeURIComponent(emailVerificationToken)}`;
-    logger.error('Failed to send verification email during resend', {
-      email: user.email,
-      error: emailError.message,
-    });
-    logger.info(`[DEVELOPMENT ONLY] Email Verification Link (Resend): ${verificationUrl}`);
-  });
-
-  return {
-    message: 'Verification email sent successfully.',
   };
 };
 
@@ -347,8 +318,6 @@ module.exports = {
   logout,
   forgotPassword,
   resetPassword,
-  verifyEmail,
-  resendVerification,
   changePassword,
   getCurrentUser,
 };

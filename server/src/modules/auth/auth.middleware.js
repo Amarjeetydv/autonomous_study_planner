@@ -40,19 +40,6 @@ const passwordSensitiveLimiter = rateLimit({
   },
 });
 
-const resendVerificationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: isDev ? 1000 : 3,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'Too many verification email requests, please try again in 15 minutes.',
-    data: null,
-    errors: [],
-  },
-});
-
 const extractAccessToken = (req) => {
   const authorizationHeader = req.headers.authorization;
 
@@ -74,7 +61,7 @@ const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, env.auth.accessTokenSecret);
     const user = await User.findById(decoded.sub).select(TOKEN_SELECT_FIELDS);
 
-    if (!user || user.status === 'suspended' || !user.isVerified) {
+    if (!user || user.status === 'suspended') {
       return next(new AppError('Account is not available', 403));
     }
 
@@ -121,7 +108,6 @@ const authorizePermissions = (...requiredPermissions) => (req, res, next) => {
 module.exports = {
   publicAuthLimiter,
   passwordSensitiveLimiter,
-  resendVerificationLimiter,
   protect,
   authorizeRoles,
   authorizePermissions,

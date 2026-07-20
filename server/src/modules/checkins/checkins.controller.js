@@ -39,6 +39,9 @@ const getHistoryController = asyncHandler(async (req, res) => {
 });
 
 const getStreakController = asyncHandler(async (req, res) => {
+  if (!req.user || (!req.user._id && !req.user.id)) {
+    throw new AppError('Authentication required', 401);
+  }
   const userId = req.user._id || req.user.id;
   const streak = await checkinsService.getStreak(userId);
 

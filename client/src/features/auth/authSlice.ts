@@ -57,11 +57,12 @@ export const registerUser = createAsyncThunk('auth/register', async (userData: a
   }
 });
 
-export const logout = createAsyncThunk('auth/logout', async () => {
+export const logout = createAsyncThunk('auth/logout', async (_, thunkAPI) => {
   try {
     await apiClient.post('/auth/logout');
-  } catch (error) {
-    // Fail silently to clear local storage anyway
+    return { success: true };
+  } catch (error: any) {
+    return thunkAPI.rejectWithValue(error.response?.data?.message || 'Network error during logout');
   } finally {
     localStorage.removeItem('asp_access_token');
   }
@@ -121,6 +122,13 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.user = null;
         state.error = null;
+        state.isLoading = false;
+      })
+      .addCase(logout.rejected, (state) => {
+        state.isAuthenticated = false;
+        state.user = null;
+        state.error = null;
+        state.isLoading = false;
       });
   },
 });

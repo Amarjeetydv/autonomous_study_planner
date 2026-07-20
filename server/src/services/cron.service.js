@@ -35,19 +35,8 @@ const cleanupExpiredTokens = async ({ User } = {}) => {
     }
   );
 
-  const emailVerificationResult = await User.updateMany(
-    { emailVerificationExpires: { $lte: now } },
-    {
-      $set: {
-        emailVerificationToken: null,
-        emailVerificationExpires: null,
-      },
-    }
-  );
-
   return {
     passwordResetResult,
-    emailVerificationResult,
   };
 };
 

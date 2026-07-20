@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { 
-  Calendar as CalendarIcon, ArrowLeft, ChevronLeft, ChevronRight, Plus, 
+  Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, 
   RefreshCw, CheckCircle, X, Loader2 
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
@@ -28,7 +27,6 @@ interface CalendarEvent {
 }
 
 export default function CalendarDashboard() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -159,22 +157,14 @@ export default function CalendarDashboard() {
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-brand-500/5 blur-[120px] pointer-events-none"></div>
 
       <div className="max-w-6xl mx-auto space-y-8 z-10 relative">
-        {/* Header bar */}
+        {/* Title block */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-900 pb-5">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="p-3 rounded-xl border border-slate-900 bg-slate-900/40 text-slate-400 hover:text-white transition"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <div>
-              <h1 className="text-xl font-extrabold text-white flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5 text-brand-400" />
-                Task Calendar Planner
-              </h1>
-              <p className="text-slate-400 text-xs mt-1">Study blocks, exam deadlines, and quiz assessment times.</p>
-            </div>
+          <div>
+            <h1 className="text-xl font-extrabold text-white flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-brand-400" />
+              Task Calendar Planner
+            </h1>
+            <p className="text-slate-400 text-xs mt-1">Study blocks, exam deadlines, and quiz assessment times.</p>
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">

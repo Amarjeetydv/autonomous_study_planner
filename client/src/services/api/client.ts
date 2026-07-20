@@ -56,8 +56,6 @@ apiClient.interceptors.response.use(
     const isPublicRoute = originalRequest.url && (
       originalRequest.url.includes('/auth/login') ||
       originalRequest.url.includes('/auth/register') ||
-      originalRequest.url.includes('/auth/verify-email') ||
-      originalRequest.url.includes('/auth/resend-verification') ||
       originalRequest.url.includes('/auth/forgot-password') ||
       originalRequest.url.includes('/auth/reset-password')
     );

@@ -1,12 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { Line, Bar } from 'react-chartjs-2';
 import { 
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, 
   BarElement, Title, Tooltip, Legend, Filler 
 } from 'chart.js';
 import { 
-  ArrowLeft, Calendar, Clock, Award, Flame, Smile, Target, Sparkles 
+  Calendar, Clock, Award, Flame, Smile, Target, Sparkles 
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
 import { AnalyticsSkeleton } from '../../components/ui/Skeleton';
@@ -47,7 +46,6 @@ interface AnalyticsData {
 }
 
 export default function Analytics() {
-  const navigate = useNavigate();
 
   // Fetch check-in history & analytics statistics
   const { data: analytics, isLoading } = useQuery({
@@ -135,18 +133,10 @@ export default function Analytics() {
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-brand-500/5 blur-[120px] pointer-events-none"></div>
 
       <div className="max-w-6xl mx-auto space-y-8 z-10 relative">
-        {/* Header bar */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="p-3 rounded-xl border border-slate-900 bg-slate-900/40 text-slate-400 hover:text-white transition"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-extrabold text-white">Study Analytics Hub</h1>
-            <p className="text-slate-400 text-xs mt-1">Review focus timelines, study duration balances, and AI performance reports.</p>
-          </div>
+        {/* Title block */}
+        <div>
+          <h1 className="text-2xl font-extrabold text-white">Study Analytics Hub</h1>
+          <p className="text-slate-400 text-xs mt-1">Review focus timelines, study duration balances, and AI performance reports.</p>
         </div>
 
         {/* Top Widgets grid */}
