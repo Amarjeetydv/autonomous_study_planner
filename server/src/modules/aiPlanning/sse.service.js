@@ -1,6 +1,6 @@
 const eventEmitter = require('../../services/eventEmitter.service');
 const jobManager = require('./services/jobManager.service');
-const AppError = require('../../utils/errors/AppError');
+const AppError = require('../../utils/AppError');
 const logger = require('../../config/logger');
 
 const subscribeToJobStream = async (req, res, jobId, user) => {
@@ -15,6 +15,8 @@ const subscribeToJobStream = async (req, res, jobId, user) => {
     throw new AppError('Forbidden: You do not have permission to access this job stream', 403);
   }
 
+  logger.info('[SSE] Client connected', { jobId, userId });
+
   // Set SSE Headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -24,16 +26,15 @@ const subscribeToJobStream = async (req, res, jobId, user) => {
     'X-Accel-Buffering': 'no',
   });
 
-  // Flush headers if using compression/gzip middleware
+  // Send initial connection event
+  res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected' })}\n\n`);
   if (typeof res.flush === 'function') {
     res.flush();
   }
 
-  // Send initial connection event
-  res.write(`event: connected\ndata: ${JSON.stringify({ status: 'connected' })}\n\n`);
-
   // Immediate catch-up if job has already progressed or completed
   if (job.status === 'completed') {
+    logger.info('[SSE] Catch-up: Job already completed', { jobId, planId: job.resultPlanId });
     res.write(`event: completed\ndata: ${JSON.stringify({
       status: 'completed',
       planId: job.resultPlanId
@@ -43,6 +44,7 @@ const subscribeToJobStream = async (req, res, jobId, user) => {
   }
 
   if (job.status === 'failed') {
+    logger.info('[SSE] Catch-up: Job already failed', { jobId, error: job.errorMessage });
     res.write(`event: error\ndata: ${JSON.stringify({
       status: 'failed',
       message: job.errorMessage || 'Generation failed'
@@ -52,6 +54,7 @@ const subscribeToJobStream = async (req, res, jobId, user) => {
   }
 
   if (job.status === 'cancelled') {
+    logger.info('[SSE] Catch-up: Job already cancelled', { jobId });
     res.write(`event: error\ndata: ${JSON.stringify({
       status: 'cancelled',
       message: job.errorMessage || 'Job cancelled'
@@ -70,43 +73,63 @@ const subscribeToJobStream = async (req, res, jobId, user) => {
   };
 
   if (job.status === 'running') {
+    logger.info('[SSE] Catch-up: Job running', { jobId, currentStage: job.currentStage, progress: job.progressPercentage });
     res.write(`event: progress\ndata: ${JSON.stringify({
       stage: job.currentStage,
       progress: job.progressPercentage,
       status: 'running',
       message: stageMessages[job.currentStage] || 'Processing plan stage...'
     })}\n\n`);
+    if (typeof res.flush === 'function') {
+      res.flush();
+    }
   }
 
   // Event handler mapping
   const onProgress = (data) => {
+    logger.info('[SSE] Emitting progress event', { jobId, stage: data.stage, progress: data.progress });
     res.write(`event: progress\ndata: ${JSON.stringify({
       stage: data.stage,
       progress: data.progress,
       status: data.status,
       message: data.message || stageMessages[data.stage] || 'Processing plan stage...'
     })}\n\n`);
+    if (typeof res.flush === 'function') {
+      res.flush();
+    }
   };
 
   const onCompleted = (data) => {
+    logger.info('[SSE] Emitting completed event', { jobId, planId: data.planId });
     res.write(`event: completed\ndata: ${JSON.stringify({
       status: 'completed',
       planId: data.planId
     })}\n\n`);
+    if (typeof res.flush === 'function') {
+      res.flush();
+    }
   };
 
   const onError = (data) => {
+    logger.info('[SSE] Emitting error event', { jobId, message: data.message });
     res.write(`event: error\ndata: ${JSON.stringify({
       status: 'failed',
       message: data.message
     })}\n\n`);
+    if (typeof res.flush === 'function') {
+      res.flush();
+    }
   };
 
   const onCancelled = (data) => {
+    logger.info('[SSE] Emitting cancelled event', { jobId, message: data.message });
     res.write(`event: error\ndata: ${JSON.stringify({
       status: 'cancelled',
       message: data.message
     })}\n\n`);
+    if (typeof res.flush === 'function') {
+      res.flush();
+    }
   };
 
   // Add listeners
@@ -122,7 +145,7 @@ const subscribeToJobStream = async (req, res, jobId, user) => {
 
   // Cleanup handler
   const cleanup = () => {
-    logger.info('SSE client disconnected', { jobId, userId });
+    logger.info('[SSE] Client disconnected and cleaning up listeners', { jobId, userId });
     clearInterval(heartbeatInterval);
     eventEmitter.off(`job:${jobId}:progress`, onProgress);
     eventEmitter.off(`job:${jobId}:completed`, onCompleted);

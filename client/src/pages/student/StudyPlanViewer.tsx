@@ -6,54 +6,10 @@ import {
   ChevronDown, ChevronUp, AlertCircle, Quote, Lightbulb, TrendingUp, Sparkles, Loader2
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
+import PlanErrorBoundary from '../../components/ui/PlanErrorBoundary';
+import { normalizeStudyPlan, NormalizedStudyPlan } from '../../utils/normalizeStudyPlan';
 
-interface AIPlan {
-  id: string;
-  goalId: string;
-  studentId: string;
-  status: string;
-  promptVersion: string;
-  goalAnalysis: {
-    workloadRating?: string;
-    weeklyCommitmentMinutes?: number;
-    riskFactors?: string[];
-    suggestedTimelineWeeks?: number;
-    weakAreas?: string[];
-  };
-  studyPlan: {
-    prioritizedSubjects?: {
-      subjectId: string;
-      subjectName: string;
-      priority: number;
-      examWeightage: string;
-      rationale: string;
-    }[];
-    subjectWeightages?: Record<string, string>;
-    rankingRationale?: string;
-  };
-  scheduler: {
-    dailyTasks?: { task: string; duration: string; type: string }[];
-    weeklyTasks?: { focus: string; hoursAllocated: number }[];
-    monthlyTasks?: { milestone: string; targetWeek: number }[];
-    bufferAllocation?: string;
-    RestDays?: string[];
-  };
-  revisionPlan?: {
-    revisionPlan?: { topic: string; reviewIntervalDays: number; date: string }[];
-    spacedRepetitionIntervals?: Record<string, number>;
-    logic?: string;
-  };
-  quizPlan?: {
-    quizPlan?: { type: string; topic: string; targetDate: string }[];
-    quizSchedule?: { examType: string; scheduledDate: string; durationMinutes: number }[];
-  };
-  motivation?: {
-    motivationalSummary?: string;
-    suggestedProductivityTips?: string[];
-  };
-}
-
-export default function StudyPlanViewer() {
+function StudyPlanViewerContent() {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
 
@@ -71,12 +27,13 @@ export default function StudyPlanViewer() {
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  // Fetch plan detail
-  const { data: plan, isLoading, error } = useQuery({
+  // Fetch plan detail & transform through normalization layer
+  const { data: plan, isLoading, error, refetch } = useQuery<NormalizedStudyPlan>({
     queryKey: ['plan', planId],
     queryFn: async () => {
       const response = await apiClient.get(`/planner/${planId}`);
-      return response.data.data.plan as AIPlan;
+      const rawPlan = response.data?.data?.plan;
+      return normalizeStudyPlan(rawPlan);
     },
     enabled: !!planId
   });
@@ -86,7 +43,7 @@ export default function StudyPlanViewer() {
     queryKey: ['goal', plan?.goalId],
     queryFn: async () => {
       const response = await apiClient.get(`/goals/${plan?.goalId}`);
-      return response.data.data.goal;
+      return response.data?.data?.goal;
     },
     enabled: !!plan?.goalId
   });
@@ -95,10 +52,12 @@ export default function StudyPlanViewer() {
   const regenerateMutation = useMutation({
     mutationFn: async () => {
       const res = await apiClient.post('/planner/generate', { goalId: plan?.goalId });
-      return res.data.data;
+      return res.data?.data;
     },
     onSuccess: (data) => {
-      navigate(`/planner/job/${data.jobId}`);
+      if (data?.jobId) {
+        navigate(`/planner/job/${data.jobId}`);
+      }
     }
   });
 
@@ -107,7 +66,6 @@ export default function StudyPlanViewer() {
   };
 
   const handleExportPDF = () => {
-    // Standard PDF print fallback trigger
     window.print();
   };
 
@@ -126,12 +84,22 @@ export default function StudyPlanViewer() {
         <AlertCircle className="h-12 w-12 text-red-500" />
         <h3 className="text-lg font-bold text-white">Failed to Load Plan</h3>
         <p className="text-sm text-center max-w-sm">The plan could not be fetched or does not exist.</p>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="bg-brand-500 text-white rounded-xl px-6 py-2.5 text-sm font-semibold hover:bg-brand-600 transition"
-        >
-          Return to Dashboard
-        </button>
+        <div className="flex gap-3 mt-2">
+          <button
+            onClick={() => refetch()}
+            aria-label="Retry loading plan"
+            className="bg-slate-900 border border-slate-800 text-slate-200 rounded-xl px-5 py-2.5 text-xs font-semibold hover:bg-slate-800 transition flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Retry
+          </button>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="bg-brand-500 text-white rounded-xl px-5 py-2.5 text-xs font-semibold hover:bg-brand-600 transition"
+          >
+            Return to Dashboard
+          </button>
+        </div>
       </div>
     );
   }
@@ -147,7 +115,9 @@ export default function StudyPlanViewer() {
               <Sparkles className="h-6 w-6 text-brand-400" />
               AI Structured Plan
             </h1>
-            <p className="text-slate-400 text-xs mt-1">Generated specifically for: <span className="text-slate-200 font-medium">{goalData?.title || 'Loading goal...'}</span></p>
+            <p className="text-slate-400 text-xs mt-1">
+              Generated specifically for: <span className="text-slate-200 font-medium">{goalData?.title || 'Study Goal'}</span>
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -210,19 +180,19 @@ export default function StudyPlanViewer() {
             <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 print:p-0 print:pt-4">
               <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/40 print:bg-slate-100 print:border-slate-200">
                 <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Estimated Workload</span>
-                <p className="text-xl font-extrabold text-white mt-1 print:text-slate-900">{plan.goalAnalysis?.workloadRating || 'Medium'}</p>
+                <p className="text-xl font-extrabold text-white mt-1 print:text-slate-900">{plan.goalAnalysis.workloadRating}</p>
                 <span className="text-xs text-slate-500 block mt-1">Based on target timelines.</span>
               </div>
               <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/40 print:bg-slate-100 print:border-slate-200">
                 <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Weekly Commitment</span>
                 <p className="text-xl font-extrabold text-white mt-1 print:text-slate-900">
-                  {plan.goalAnalysis?.weeklyCommitmentMinutes ? Math.round(plan.goalAnalysis.weeklyCommitmentMinutes / 60) : (goalData?.dailyStudyHours * goalData?.weeklyStudyDays || 15)} Hours
+                  {Math.round(plan.goalAnalysis.weeklyCommitmentMinutes / 60)} Hours
                 </p>
                 <span className="text-xs text-slate-500 block mt-1">Hours expected per week.</span>
               </div>
               <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800/40 print:bg-slate-100 print:border-slate-200">
                 <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Target Period</span>
-                <p className="text-xl font-extrabold text-white mt-1 print:text-slate-900">{plan.goalAnalysis?.suggestedTimelineWeeks || 12} Weeks</p>
+                <p className="text-xl font-extrabold text-white mt-1 print:text-slate-900">{plan.goalAnalysis.suggestedTimelineWeeks} Weeks</p>
                 <span className="text-xs text-slate-500 block mt-1">Estimated duration weeks.</span>
               </div>
             </div>
@@ -246,25 +216,29 @@ export default function StudyPlanViewer() {
           
           {openSections.priorities && (
             <div className="p-6 space-y-4 print:p-0 print:pt-4">
-              {plan.studyPlan?.rankingRationale && (
+              {plan.studyPlan.rankingRationale && (
                 <p className="text-xs text-slate-400 italic mb-4 print:text-slate-700">"{plan.studyPlan.rankingRationale}"</p>
               )}
-              <div className="space-y-3">
-                {plan.studyPlan?.prioritizedSubjects?.map((sub, idx) => (
-                  <div key={idx} className="flex flex-col md:flex-row justify-between bg-slate-900/30 p-4 rounded-xl border border-slate-800/60 items-start md:items-center gap-2 print:bg-white print:border-slate-200">
-                    <div className="flex items-center gap-3">
-                      <span className="h-6 w-6 rounded bg-slate-950 border border-slate-800 text-xs font-bold flex items-center justify-center text-slate-400 print:bg-slate-100 print:border-slate-200 print:text-slate-900">
-                        {idx + 1}
-                      </span>
-                      <div>
-                        <h4 className="text-sm font-bold text-white print:text-slate-900">{sub.subjectName}</h4>
-                        <span className="text-[10px] text-slate-500">Exam Weight: {sub.examWeightage || 'N/A'}</span>
+              {plan.studyPlan.prioritizedSubjects.length > 0 ? (
+                <div className="space-y-3">
+                  {plan.studyPlan.prioritizedSubjects.map((sub, idx) => (
+                    <div key={idx} className="flex flex-col md:flex-row justify-between bg-slate-900/30 p-4 rounded-xl border border-slate-800/60 items-start md:items-center gap-2 print:bg-white print:border-slate-200">
+                      <div className="flex items-center gap-3">
+                        <span className="h-6 w-6 rounded bg-slate-950 border border-slate-800 text-xs font-bold flex items-center justify-center text-slate-400 print:bg-slate-100 print:border-slate-200 print:text-slate-900">
+                          {sub.priority || idx + 1}
+                        </span>
+                        <div>
+                          <h4 className="text-sm font-bold text-white print:text-slate-900">{sub.subjectName}</h4>
+                          <span className="text-[10px] text-slate-500">Exam Weight: {sub.examWeightage}</span>
+                        </div>
                       </div>
+                      <p className="text-xs text-slate-400 md:max-w-md print:text-slate-700">{sub.rationale}</p>
                     </div>
-                    <p className="text-xs text-slate-400 md:max-w-md print:text-slate-700">{sub.rationale}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">No subject priorities configured.</p>
+              )}
             </div>
           )}
         </div>
@@ -289,48 +263,62 @@ export default function StudyPlanViewer() {
               {/* Daily tasks */}
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Daily Layout Study Block</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {plan.scheduler?.dailyTasks?.map((dt, idx) => (
-                    <div key={idx} className="bg-slate-900/30 p-3 rounded-lg border border-slate-800/40 print:bg-slate-50 print:border-slate-200">
-                      <span className="text-[10px] font-bold text-brand-400 uppercase tracking-widest">{dt.duration}</span>
-                      <p className="text-sm font-bold text-white mt-1 print:text-slate-900">{dt.task}</p>
-                      <span className="text-[10px] text-slate-500 uppercase">{dt.type}</span>
-                    </div>
-                  ))}
-                </div>
+                {plan.scheduler.dailyTasks.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {plan.scheduler.dailyTasks.map((dt, idx) => (
+                      <div key={idx} className="bg-slate-900/30 p-3 rounded-lg border border-slate-800/40 print:bg-slate-50 print:border-slate-200">
+                        <span className="text-[10px] font-bold text-brand-400 uppercase tracking-widest">{dt.duration}</span>
+                        <p className="text-sm font-bold text-white mt-1 print:text-slate-900">{dt.task}</p>
+                        <span className="text-[10px] text-slate-500 uppercase">{dt.type}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                    No study sessions generated.
+                  </div>
+                )}
               </div>
 
               {/* Weekly focus */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-900">
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Weekly Hours Distribution</h3>
-                  <div className="space-y-2">
-                    {plan.scheduler?.weeklyTasks?.map((wt, idx) => (
-                      <div key={idx} className="flex justify-between items-center bg-slate-900/10 p-3 rounded-lg border border-slate-900 print:bg-white print:border-slate-200">
-                        <span className="text-xs font-semibold text-slate-300 print:text-slate-900">{wt.focus}</span>
-                        <span className="text-xs font-bold text-brand-400">{wt.hoursAllocated} hrs</span>
-                      </div>
-                    ))}
-                  </div>
+                  {plan.scheduler.weeklyTasks.length > 0 ? (
+                    <div className="space-y-2">
+                      {plan.scheduler.weeklyTasks.map((wt, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-slate-900/10 p-3 rounded-lg border border-slate-900 print:bg-white print:border-slate-200">
+                          <span className="text-xs font-semibold text-slate-300 print:text-slate-900">{wt.focus}</span>
+                          <span className="text-xs font-bold text-brand-400">{wt.hoursAllocated} hrs</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">No weekly distribution tasks.</p>
+                  )}
                 </div>
 
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Monthly Roadmap Milestones</h3>
-                  <div className="space-y-2">
-                    {plan.scheduler?.monthlyTasks?.map((mt, idx) => (
-                      <div key={idx} className="flex justify-between items-center bg-slate-900/10 p-3 rounded-lg border border-slate-900 print:bg-white print:border-slate-200">
-                        <span className="text-xs font-semibold text-slate-300 print:text-slate-900">{mt.milestone}</span>
-                        <span className="text-xs font-bold text-brand-400">Week {mt.targetWeek}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {plan.scheduler.monthlyTasks.length > 0 ? (
+                    <div className="space-y-2">
+                      {plan.scheduler.monthlyTasks.map((mt, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-slate-900/10 p-3 rounded-lg border border-slate-900 print:bg-white print:border-slate-200">
+                          <span className="text-xs font-semibold text-slate-300 print:text-slate-900">{mt.milestone}</span>
+                          <span className="text-xs font-bold text-brand-400">Week {mt.targetWeek}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">No monthly roadmap milestones.</p>
+                  )}
                 </div>
               </div>
 
               {/* Rest days & buffer */}
-              {(plan.scheduler?.RestDays || plan.scheduler?.bufferAllocation) && (
+              {(plan.scheduler.RestDays.length > 0 || plan.scheduler.bufferAllocation) && (
                 <div className="pt-4 border-t border-slate-900 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                  {plan.scheduler.RestDays && plan.scheduler.RestDays.length > 0 && (
+                  {plan.scheduler.RestDays.length > 0 && (
                     <div>
                       <span className="text-slate-500 font-bold block">Weekly Rest Days:</span>
                       <span className="text-slate-300 print:text-slate-900">{plan.scheduler.RestDays.join(', ')}</span>
@@ -365,20 +353,24 @@ export default function StudyPlanViewer() {
           
           {openSections.revision && (
             <div className="p-6 space-y-4 print:p-0 print:pt-4">
-              {plan.revisionPlan?.logic && (
+              {plan.revisionPlan.logic && (
                 <p className="text-xs text-slate-400 italic mb-3 print:text-slate-700">"{plan.revisionPlan.logic}"</p>
               )}
-              <div className="max-h-[300px] overflow-y-auto pr-2 space-y-2">
-                {plan.revisionPlan?.revisionPlan?.map((rev, idx) => (
-                  <div key={idx} className="flex justify-between items-center bg-slate-900/30 p-3 rounded-lg border border-slate-800/40 print:bg-white print:border-slate-200">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-brand-400">Review Interval: {rev.reviewIntervalDays} Days</span>
-                      <h4 className="text-xs font-bold text-white print:text-slate-900 mt-0.5">{rev.topic}</h4>
+              {plan.revisionPlan.revisionPlan.length > 0 ? (
+                <div className="max-h-[300px] overflow-y-auto pr-2 space-y-2">
+                  {plan.revisionPlan.revisionPlan.map((rev, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-slate-900/30 p-3 rounded-lg border border-slate-800/40 print:bg-white print:border-slate-200">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-brand-400">Review Interval: {rev.reviewIntervalDays} Days</span>
+                        <h4 className="text-xs font-bold text-white print:text-slate-900 mt-0.5">{rev.topic}</h4>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-400">{rev.date}</span>
                     </div>
-                    <span className="text-xs font-semibold text-slate-400">{rev.date}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">No revision tasks configured.</p>
+              )}
             </div>
           )}
         </div>
@@ -400,24 +392,28 @@ export default function StudyPlanViewer() {
           
           {openSections.mockTests && (
             <div className="p-6 space-y-4 print:p-0 print:pt-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {plan.quizPlan?.quizSchedule?.map((quiz, idx) => (
-                  <div key={idx} className="bg-slate-900/30 p-4 rounded-xl border border-slate-800/40 print:bg-slate-50 print:border-slate-200">
-                    <span className="text-[9px] uppercase font-bold text-emerald-400">Mock Diagnostic Exam</span>
-                    <h4 className="text-sm font-bold text-white mt-1 print:text-slate-900">{quiz.examType}</h4>
-                    <div className="flex justify-between items-center text-xs text-slate-500 mt-2 border-t border-slate-850 pt-2">
-                      <span>Date: {quiz.scheduledDate}</span>
-                      <span>Duration: {quiz.durationMinutes} Mins</span>
+              {plan.quizPlan.quizSchedule.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {plan.quizPlan.quizSchedule.map((quiz, idx) => (
+                    <div key={idx} className="bg-slate-900/30 p-4 rounded-xl border border-slate-800/40 print:bg-slate-50 print:border-slate-200">
+                      <span className="text-[9px] uppercase font-bold text-emerald-400">Mock Diagnostic Exam</span>
+                      <h4 className="text-sm font-bold text-white mt-1 print:text-slate-900">{quiz.examType}</h4>
+                      <div className="flex justify-between items-center text-xs text-slate-500 mt-2 border-t border-slate-850 pt-2">
+                        <span>Date: {quiz.scheduledDate}</span>
+                        <span>Duration: {quiz.durationMinutes} Mins</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">No mock quizzes scheduled.</p>
+              )}
             </div>
           )}
         </div>
 
         {/* 6. MOTIVATION ACCORDION */}
-        {plan.motivation && (
+        {(plan.motivation.motivationalSummary || plan.motivation.suggestedProductivityTips.length > 0) && (
           <div className="glass-panel rounded-2xl border border-slate-900 overflow-hidden print:border-none print:shadow-none">
             <button
               onClick={() => toggleSection('motivation')}
@@ -443,7 +439,7 @@ export default function StudyPlanViewer() {
                   </div>
                 )}
 
-                {plan.motivation.suggestedProductivityTips && plan.motivation.suggestedProductivityTips.length > 0 && (
+                {plan.motivation.suggestedProductivityTips.length > 0 && (
                   <div>
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
                       <Lightbulb className="h-4 w-4 text-amber-400" />
@@ -466,5 +462,13 @@ export default function StudyPlanViewer() {
 
       </div>
     </div>
+  );
+}
+
+export default function StudyPlanViewer() {
+  return (
+    <PlanErrorBoundary>
+      <StudyPlanViewerContent />
+    </PlanErrorBoundary>
   );
 }

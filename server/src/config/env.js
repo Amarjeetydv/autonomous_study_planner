@@ -29,10 +29,10 @@ const env = {
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
-    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-flash-lite-latest',
     temperature: Number(process.env.GEMINI_TEMPERATURE || 0.4),
     timeoutMs: Number(process.env.GEMINI_TIMEOUT_MS || 60000),
-    maxRetries: Number(process.env.GEMINI_MAX_RETRIES || 2),
+    maxRetries: Number(process.env.GEMINI_MAX_RETRIES || 4),
     streamingEnabled: process.env.GEMINI_STREAMING_ENABLED !== 'false',
   },
   upload: {

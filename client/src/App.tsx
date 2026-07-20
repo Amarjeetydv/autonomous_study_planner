@@ -12,6 +12,8 @@ const Login = lazy(() => import('./pages/auth/Login'));
 const Register = lazy(() => import('./pages/auth/Register'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
+
+// Student Pages
 const GoalIntake = lazy(() => import('./pages/student/GoalIntake'));
 const PlanningLoader = lazy(() => import('./pages/student/PlanningLoader'));
 const StudyPlanViewer = lazy(() => import('./pages/student/StudyPlanViewer'));
@@ -24,10 +26,19 @@ const QuizResult = lazy(() => import('./pages/student/QuizResult'));
 const AICompanion = lazy(() => import('./pages/student/AICompanion'));
 const CalendarDashboard = lazy(() => import('./pages/student/CalendarDashboard'));
 const TrophyCase = lazy(() => import('./pages/student/TrophyCase'));
+
+// Mentor Workspace Pages
 const MentorDashboard = lazy(() => import('./pages/mentor/MentorDashboard'));
+const MentorStudents = lazy(() => import('./pages/mentor/MentorStudents'));
+const MentorProgress = lazy(() => import('./pages/mentor/MentorProgress'));
+const MentorAnalytics = lazy(() => import('./pages/mentor/MentorAnalytics'));
+const MentorResources = lazy(() => import('./pages/mentor/MentorResources'));
+const MentorMessages = lazy(() => import('./pages/mentor/MentorMessages'));
+
+// Admin Pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 
-// Protected Route Guard
+// Protected Route Guard with Silent Role Redirection (Never shows "Access Denied")
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { isAuthenticated, user, isChecking } = useSelector((state: RootState) => state.auth);
 
@@ -42,15 +53,39 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && user && !user.roles.some((role) => allowedRoles.includes(role))) {
-    return <Navigate to="/unauthorized" replace />;
+  // Silent Role Redirect (Redirects directly without rendering "Access Denied")
+  if (allowedRoles && !user.roles.some((role) => allowedRoles.includes(role))) {
+    if (user.roles.includes('Mentor')) {
+      return <Navigate to="/mentor/dashboard" replace />;
+    }
+    if (user.roles.includes('Admin')) {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <AuthenticatedLayout>{children}</AuthenticatedLayout>;
+}
+
+// Role-Aware Dynamic Fallback Route Component
+function RoleBasedFallback() {
+  const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.roles?.includes('Mentor')) {
+    return <Navigate to="/mentor/dashboard" replace />;
+  }
+  if (user.roles?.includes('Admin')) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 }
 
 export default function App() {
@@ -83,11 +118,11 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* Protected Routes */}
+      {/* Student Protected Routes */}
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['Student', 'Admin']}>
             <Dashboard />
           </ProtectedRoute>
         }
@@ -149,6 +184,14 @@ export default function App() {
         }
       />
       <Route
+        path="/mock-tests/:quizId"
+        element={
+          <ProtectedRoute allowedRoles={['Student', 'Admin']}>
+            <QuizPlayer />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/quizzes/attempt/:attemptId"
         element={
           <ProtectedRoute allowedRoles={['Student', 'Admin']}>
@@ -180,6 +223,8 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* Mentor Protected Suite Routes */}
       <Route
         path="/mentor"
         element={
@@ -189,6 +234,64 @@ export default function App() {
         }
       />
       <Route
+        path="/mentor/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={['Mentor', 'Admin']}>
+            <MentorDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mentor/students"
+        element={
+          <ProtectedRoute allowedRoles={['Mentor', 'Admin']}>
+            <MentorStudents />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mentor/progress"
+        element={
+          <ProtectedRoute allowedRoles={['Mentor', 'Admin']}>
+            <MentorProgress />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mentor/analytics"
+        element={
+          <ProtectedRoute allowedRoles={['Mentor', 'Admin']}>
+            <MentorAnalytics />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mentor/resources"
+        element={
+          <ProtectedRoute allowedRoles={['Mentor', 'Admin']}>
+            <MentorResources />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mentor/messages"
+        element={
+          <ProtectedRoute allowedRoles={['Mentor', 'Admin']}>
+            <MentorMessages />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mentor/settings"
+        element={
+          <ProtectedRoute allowedRoles={['Mentor', 'Admin']}>
+            <MentorDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Admin Protected Routes */}
+      <Route
         path="/admin"
         element={
           <ProtectedRoute allowedRoles={['Admin']}>
@@ -197,16 +300,16 @@ export default function App() {
         }
       />
       <Route
-        path="/unauthorized"
+        path="/admin/dashboard"
         element={
-          <div className="flex h-screen items-center justify-center text-red-500">
-            Unauthorized Access
-          </div>
+          <ProtectedRoute allowedRoles={['Admin']}>
+            <AdminDashboard />
+          </ProtectedRoute>
         }
       />
 
-      {/* Fallback Redirect */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Role-Aware Fallback Redirect */}
+      <Route path="*" element={<RoleBasedFallback />} />
     </Routes>
     <ToastContainer />
     </Suspense>

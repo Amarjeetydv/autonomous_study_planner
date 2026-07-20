@@ -5,7 +5,7 @@ const quizSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     description: { type: String, default: '' },
-    subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subjects', required: true, index: true },
+    subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subjects', default: null, index: true },
     topicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Topics', index: true },
     studyPlanId: { type: mongoose.Schema.Types.ObjectId, ref: 'StudyPlans' },
     goalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Goals', required: true, index: true },

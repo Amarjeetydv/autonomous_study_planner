@@ -94,6 +94,62 @@ const getFeedbackListController = asyncHandler(async (req, res) => {
   });
 });
 
+const getAvailableMentorsController = asyncHandler(async (req, res) => {
+  const mentors = await mentorsService.getAvailableMentors();
+  return sendResponse(res, {
+    success: true,
+    message: 'Available mentors list retrieved successfully',
+    data: { mentors },
+    errors: [],
+  });
+});
+
+const getConnectedMentorController = asyncHandler(async (req, res) => {
+  const studentId = req.user._id || req.user.id;
+  const connected = await mentorsService.getConnectedMentorForStudent(studentId);
+  const pending = await mentorsService.getPendingLinkForStudent(studentId);
+  return sendResponse(res, {
+    success: true,
+    message: 'Active mentorship status loaded',
+    data: { connected, pending },
+    errors: [],
+  });
+});
+
+const inviteMentorController = asyncHandler(async (req, res) => {
+  const studentId = req.user._id || req.user.id;
+  const { email, mentorId } = req.body;
+  const request = await mentorsService.inviteMentor({ studentId, email, mentorId });
+  return sendResponse(res, {
+    success: true,
+    message: 'Mentorship request dispatched successfully',
+    data: { request },
+    errors: [],
+  }, 201);
+});
+
+const requestReviewController = asyncHandler(async (req, res) => {
+  const studentId = req.user._id || req.user.id;
+  await mentorsService.requestReview(studentId);
+  return sendResponse(res, {
+    success: true,
+    message: 'Progress review requested from mentor',
+    data: {},
+    errors: [],
+  });
+});
+
+const getPendingRequestsController = asyncHandler(async (req, res) => {
+  const mentorId = req.user._id || req.user.id;
+  const requests = await mentorsService.getPendingRequests(mentorId);
+  return sendResponse(res, {
+    success: true,
+    message: 'Pending student invitations retrieved successfully',
+    data: { requests },
+    errors: [],
+  });
+});
+
 module.exports = {
   requestMentorLinkController,
   acceptStudentRequestController,
@@ -102,4 +158,9 @@ module.exports = {
   getStudentDetailController,
   leaveFeedbackController,
   getFeedbackListController,
+  getAvailableMentorsController,
+  getConnectedMentorController,
+  inviteMentorController,
+  requestReviewController,
+  getPendingRequestsController,
 };

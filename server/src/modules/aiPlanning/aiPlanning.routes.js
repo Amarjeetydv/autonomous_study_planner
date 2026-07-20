@@ -2,6 +2,7 @@ const express = require('express');
 const { protect, authorizeRoles } = require('../auth/auth.middleware');
 const validateRequest = require('../../middlewares/validateRequest.middleware');
 const { 
+  listMyPlansController,
   generatePlanController, 
   getPlanController, 
   listPlansController, 
@@ -27,6 +28,7 @@ const aiPlanWriteAccess = [protect, authorizeRoles('Student', 'Admin', 'Mentor')
 router.get('/', ...aiPlanAccess, listPlanValidators, validateRequest, listPlansController);
 router.get('/history', ...aiPlanAccess, listPlanValidators, validateRequest, listPlansController);
 router.post('/generate', ...aiPlanWriteAccess, generatePlanValidators, validateRequest, generatePlanController);
+router.get('/my', ...aiPlanAccess, listMyPlansController);
 router.get('/:planId', ...aiPlanAccess, planIdParamValidator, validateRequest, getPlanController);
 router.delete('/:planId', ...aiPlanWriteAccess, planIdParamValidator, validateRequest, deletePlanController);
 

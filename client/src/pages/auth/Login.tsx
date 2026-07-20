@@ -17,7 +17,7 @@ export default function Login() {
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
   
-  const { isAuthenticated, isLoading, error } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated, isLoading, error, user } = useSelector((state: RootState) => state.auth);
 
   useEffect(() => {
     dispatch(clearError());
@@ -25,11 +25,29 @@ export default function Login() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      toast.success('Welcome back to Autonomous Study Planner!', '🎉 Welcome Back');
-      navigate(from, { replace: true });
+    if (isAuthenticated && user) {
+      toast.success('Welcome back to StudyPilot AI!', '🎉 Welcome Back');
+
+      let targetPath = '/dashboard';
+      if (user.roles?.includes('Mentor')) {
+        targetPath = '/mentor/dashboard';
+      } else if (user.roles?.includes('Admin')) {
+        targetPath = '/admin/dashboard';
+      }
+
+      if (from && from !== '/dashboard' && from !== '/') {
+        if (user.roles?.includes('Mentor') && !from.startsWith('/mentor')) {
+          targetPath = '/mentor/dashboard';
+        } else if (user.roles?.includes('Student') && (from.startsWith('/mentor') || from.startsWith('/admin'))) {
+          targetPath = '/dashboard';
+        } else {
+          targetPath = from;
+        }
+      }
+
+      navigate(targetPath, { replace: true });
     }
-  }, [isAuthenticated, navigate, from]);
+  }, [isAuthenticated, user, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

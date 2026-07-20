@@ -60,7 +60,6 @@ const baseGoalValidators = [
   body('prioritySubjects').optional({ nullable: true }).isArray().withMessage('prioritySubjects must be an array'),
   ...subjectItemValidators('strongSubjects'),
   ...subjectItemValidators('weakSubjects'),
-  ...subjectItemValidators('selectedSubjects'),
   ...subjectItemValidators('prioritySubjects'),
 ];
 
@@ -106,7 +105,6 @@ const updateGoalValidators = [
   subjectArrayValidator('prioritySubjects'),
   ...subjectItemValidators('strongSubjects'),
   ...subjectItemValidators('weakSubjects'),
-  ...subjectItemValidators('selectedSubjects'),
   ...subjectItemValidators('prioritySubjects'),
   body('status').not().exists().withMessage('Use dedicated goal action endpoints to change status'),
 ];

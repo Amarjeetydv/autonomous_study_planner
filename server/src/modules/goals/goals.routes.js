@@ -28,6 +28,7 @@ router.delete('/:goalId', ...studentWriter, goalIdParamValidator, validateReques
 router.post('/:goalId/pause', ...studentWriter, goalIdParamValidator, validateRequest, pauseGoalController);
 router.post('/:goalId/resume', ...studentWriter, goalIdParamValidator, validateRequest, resumeGoalController);
 router.post('/:goalId/archive', ...studentWriter, goalIdParamValidator, validateRequest, archiveGoalController);
+router.put('/:goalId/archive', ...studentWriter, goalIdParamValidator, validateRequest, archiveGoalController);
 router.post('/:goalId/complete', ...studentWriter, goalIdParamValidator, validateRequest, completeGoalController);
 router.post('/:goalId/duplicate', ...studentWriter, goalIdParamValidator, duplicateGoalValidator, validateRequest, duplicateGoalController);
 

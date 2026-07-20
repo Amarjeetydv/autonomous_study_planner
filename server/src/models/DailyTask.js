@@ -30,6 +30,13 @@ const dailyTaskSchema = new mongoose.Schema(
     notes: { type: String, default: '' },
     aiGenerated: { type: Boolean, default: true },
     rescheduledFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyTasks', default: null },
+    plannedDate: { type: Date },
+    plannedStartTime: { type: String },
+    plannedEndTime: { type: String },
+    timezone: { type: String, default: 'UTC' },
+    weekNumber: { type: Number },
+    dayNumber: { type: Number },
+    isRescheduled: { type: Boolean, default: false },
   },
   { timestamps: true, collection: 'DailyTasks' }
 );

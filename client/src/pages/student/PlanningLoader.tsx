@@ -12,12 +12,12 @@ interface StageState {
 }
 
 const STAGES: StageState[] = [
-  { id: 'goalAnalyzer', name: 'Goal Analyzer', description: 'Assessing study workload and target timeline', progress: 15 },
-  { id: 'subjectPrioritizer', name: 'Subject Prioritizer', description: 'Ranking topic weightage and weaknesses', progress: 30 },
-  { id: 'scheduleGenerator', name: 'Schedule Generator', description: 'Structuring daily, weekly study blocks', progress: 50 },
-  { id: 'revisionPlanner', name: 'Revision Planner', description: 'Injecting spaced repetition study checks', progress: 70 },
-  { id: 'mockTestPlanner', name: 'Mock Test Planner', description: 'Scheduling practice quizzes and diagnostic exams', progress: 90 },
-  { id: 'motivation', name: 'Motivation Agent', description: 'Formulating productivity tips and final review', progress: 100 }
+  { id: 'goalAnalyzer', name: 'Understanding your goal...', description: 'Assessing study workload and target timeline', progress: 15 },
+  { id: 'subjectPrioritizer', name: 'Designing your study roadmap...', description: 'Ranking topic weightage and key focus areas', progress: 30 },
+  { id: 'scheduleGenerator', name: 'Balancing daily workload...', description: 'Structuring daily and weekly study blocks', progress: 50 },
+  { id: 'revisionPlanner', name: 'Scheduling revision sessions...', description: 'Injecting spaced repetition review intervals', progress: 70 },
+  { id: 'mockTestPlanner', name: 'Preparing practice tests...', description: 'Scheduling practice quizzes and diagnostic checks', progress: 90 },
+  { id: 'motivation', name: 'Finalizing your personalized plan...', description: 'Formulating productivity tips and final review', progress: 100 }
 ];
 
 export default function PlanningLoader() {
@@ -38,6 +38,14 @@ export default function PlanningLoader() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const navTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryAttemptRef = useRef<number>(0);
+  const statusRef = useRef<'queued' | 'running' | 'completed' | 'failed'>(status);
+
+  const updateStatus = (newStatus: 'queued' | 'running' | 'completed' | 'failed') => {
+    statusRef.current = newStatus;
+    setStatus(newStatus);
+  };
 
   // 1. Fetch initial job state on mount to support refresh recovery & find goalId
   useEffect(() => {
@@ -51,19 +59,19 @@ export default function PlanningLoader() {
           setGoalId(job.goalId);
           if (job.status === 'completed') {
             setProgress(100);
-            setStatus('completed');
+            updateStatus('completed');
             if (job.resultPlanId) {
               navigate(`/planner/${job.resultPlanId}`);
             }
           } else if (job.status === 'failed') {
-            setStatus('failed');
+            updateStatus('failed');
             setErrorMessage(job.errorMessage || 'AI planning job failed.');
           } else if (job.status === 'cancelled') {
-            setStatus('failed');
+            updateStatus('failed');
             setErrorMessage('Planning job was cancelled.');
           } else {
             // queued or running
-            setStatus(job.status);
+            updateStatus(job.status);
             if (job.progressPercentage) {
               setProgress(job.progressPercentage);
             }
@@ -86,19 +94,24 @@ export default function PlanningLoader() {
 
   // 2. Stream connection and timeouts
   useEffect(() => {
-    if (!jobId || status === 'completed') return;
-
+    if (!jobId || statusRef.current === 'completed' || status === 'completed') {
+      console.log("[PlanningLoader] Skipping stream because job is already completed");
+      return;
+    }
+    console.log("[PlanningLoader] Initialized for Job ID:", jobId);
     const token = localStorage.getItem('asp_access_token') || '';
     const streamUrl = `${API_BASE_URL}/planner/job/${jobId}/stream?token=${encodeURIComponent(token)}`;
+    console.log("[PlanningLoader] Connecting to EventSource URL:", streamUrl);
 
-    // Track elapsed time & handle 30s timeout
+    // Track elapsed time & handle 90s timeout
     if (!timerRef.current) {
       timerRef.current = setInterval(() => {
         setElapsedSeconds(prev => {
           const nextValue = prev + 1;
-          if (nextValue >= 30) {
-            handleErrorState('Planning timed out. The system took longer than 30 seconds to generate your plan. Please check your setup and try again.');
-            return 30;
+          if (nextValue >= 90) {
+            console.log("[PlanningLoader] Timeout event triggered at 90s");
+            handleErrorState("We couldn't finish creating your study plan. This usually happens because the AI service took too long to respond. Please try again in a few moments.");
+            return 90;
           }
           return nextValue;
         });
@@ -114,18 +127,22 @@ export default function PlanningLoader() {
       eventSourceRef.current = es;
 
       es.addEventListener('connected', () => {
-        setStatus('running');
+        console.log("[PlanningLoader] Received EventSource 'connected' event");
+        updateStatus('running');
         setIsReconnecting(false);
+        retryAttemptRef.current = 0;
         setRetryAttempt(0);
       });
 
       es.addEventListener('progress', (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log("[PlanningLoader] Received EventSource 'progress' event:", data);
           setCurrentStageId(data.stage);
           setProgress(data.progress);
-          setStatus('running');
+          updateStatus('running');
           setIsReconnecting(false);
+          retryAttemptRef.current = 0;
           setRetryAttempt(0);
 
           const stageIndex = STAGES.findIndex(s => s.id === data.stage);
@@ -134,35 +151,41 @@ export default function PlanningLoader() {
             setCompletedStages(completed);
           }
         } catch (err) {
-          // parse error
+          console.error("[PlanningLoader] Failed to parse progress JSON:", err);
         }
       });
 
       es.addEventListener('completed', (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log("[PlanningLoader] Received EventSource 'completed' event:", data);
           setProgress(100);
-          setStatus('completed');
+          updateStatus('completed');
           clearTimers();
 
-          setTimeout(() => {
-            es.close();
+          console.log("[PlanningLoader] Navigation trigger queued for /planner/" + data.planId);
+          navTimeoutRef.current = setTimeout(() => {
+            if (eventSourceRef.current) {
+              eventSourceRef.current.close();
+            }
             navigate(`/planner/${data.planId}`);
           }, 1500);
         } catch (err) {
-          // parse error
+          console.error("[PlanningLoader] Failed to parse completed JSON:", err);
         }
       });
 
       es.addEventListener('error', (event: any) => {
+        console.warn("[PlanningLoader] Received EventSource 'error' event:", event);
         try {
           const data = JSON.parse(event.data || '{}');
+          console.log("[PlanningLoader] Parsed error event data:", data);
           if (data.status === 'failed' || data.status === 'cancelled') {
             handleErrorState(data.message || 'Generation aborted due to errors.');
             return;
           }
         } catch (err) {
-          // Parse failed, handle connection issues
+          // Parse failed
         }
 
         es.close();
@@ -171,26 +194,25 @@ export default function PlanningLoader() {
     };
 
     const handleReconnection = () => {
-      setRetryAttempt(prev => {
-        const nextAttempt = prev + 1;
-        if (nextAttempt > 5) {
-          handleErrorState('Lost connection while generating your study plan.');
-          return 5;
-        }
+      const nextAttempt = retryAttemptRef.current + 1;
+      retryAttemptRef.current = nextAttempt;
+      setRetryAttempt(nextAttempt);
 
-        setIsReconnecting(true);
-        const backoffDelay = Math.pow(2, prev) * 1000;
-        
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connectSSE();
-        }, backoffDelay);
+      if (nextAttempt > 5) {
+        handleErrorState('Lost connection while generating your study plan.');
+        return;
+      }
 
-        return nextAttempt;
-      });
+      setIsReconnecting(true);
+      const backoffDelay = Math.pow(2, nextAttempt - 1) * 1000;
+      
+      reconnectTimeoutRef.current = setTimeout(() => {
+        connectSSE();
+      }, backoffDelay);
     };
 
     const handleErrorState = (msg: string) => {
-      setStatus('failed');
+      updateStatus('failed');
       setErrorMessage(msg);
       clearTimers();
       if (eventSourceRef.current) {
@@ -204,20 +226,9 @@ export default function PlanningLoader() {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      clearTimers();
     };
-  }, [jobId, status, retryAttempt, navigate]);
-
-  // Clean up all timers when component unmounts or completed
-  useEffect(() => {
-    return () => {
-      if (status === 'completed' || status === 'failed') {
-        clearTimers();
-      }
-    };
-  }, [status]);
+  }, [jobId, navigate]);
 
   const clearTimers = () => {
     if (timerRef.current) {
@@ -227,6 +238,10 @@ export default function PlanningLoader() {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
+    }
+    if (navTimeoutRef.current) {
+      clearTimeout(navTimeoutRef.current);
+      navTimeoutRef.current = null;
     }
   };
 
@@ -241,6 +256,7 @@ export default function PlanningLoader() {
       setIsRetryingCreation(true);
       setErrorMessage('');
       setElapsedSeconds(0);
+      retryAttemptRef.current = 0;
       setRetryAttempt(0);
       setIsReconnecting(false);
 
@@ -277,7 +293,7 @@ export default function PlanningLoader() {
   };
 
   const getEstimatedRemainingTime = () => {
-    const estTotal = 30;
+    const estTotal = 90;
     const remaining = Math.max(estTotal - elapsedSeconds, 1);
     if (status === 'completed') return 'Finished';
     if (status === 'failed') return 'Failed';

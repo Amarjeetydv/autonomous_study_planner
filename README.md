@@ -1,24 +1,25 @@
-# 🎓 Autonomous Study Planner
+# 🎓 StudyPilot AI (Autonomous Study Planner)
 
-> An intelligent, multi-agent AI-driven study planning & knowledge mastery platform built with **React**, **Node.js/Express**, **MongoDB**, **Google Gemini AI**, and **Server-Sent Events (SSE)**.
+> An intelligent, multi-agent AI-driven study planning & knowledge mastery platform built with **React 19**, **Node.js/Express**, **MongoDB**, **Google Gemini AI**, and **Server-Sent Events (SSE)**.
 
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/Amarjeetydv/autonomous_study_planner)
 [![React](https://img.shields.io/badge/Frontend-React%2019%20%7C%20Vite%20%7C%20Tailwind-61DAFB?logo=react)](https://react.dev)
 [![NodeJS](https://img.shields.io/badge/Backend-Node.js%20%7C%20Express-339933?logo=nodedotjs)](https://nodejs.org)
 [![Gemini AI](https://img.shields.io/badge/AI-Google%20Gemini%202.0-8E75B2?logo=google)](https://ai.google.dev)
+[![Version](https://img.shields.io/badge/Release-v1.0.0-emerald.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
 ## 🌟 Overview
 
-**Autonomous Study Planner** is a next-generation adaptive study management system that acts as a personal AI tutor and academic strategist. Traditional study planners require manual input and fail when schedules change. Our platform solves this using a **Multi-Agent AI System** that creates personalized study roadmaps, dynamically reschedules study blocks when sessions are missed, tracks topic-level mastery, generates diagnostic quizzes, and keeps students motivated with gamified milestones.
+**StudyPilot AI** is a next-generation adaptive study management system that acts as a personal AI tutor, academic strategist, and mentorship workspace. Traditional study planners require manual input and fail when schedules change. Our platform solves this using a **Multi-Agent AI System** that creates personalized study roadmaps, dynamically reschedules study blocks when sessions are missed, tracks topic-level mastery, generates diagnostic quizzes, provides mentor-student messaging, and keeps students motivated with gamified milestones.
 
 ---
 
 ## 🏗 System Architecture & Multi-Agent AI Pipeline
 
-The core engine relies on **9 Specialized AI Agents** orchestrating together via **Server-Sent Events (SSE)** to deliver real-time progress updates to the user as their customized plan is generated.
+The core engine relies on **Specialized AI Agents** orchestrating together via **Server-Sent Events (SSE)** to deliver real-time progress updates to the user as their customized plan is generated.
 
 ```mermaid
 flowchart TD
@@ -39,40 +40,38 @@ flowchart TD
 
     Multi-Agent AI Engine --> DB[(MongoDB Storage)]
     Multi-Agent AI Engine --> UI[Live Interactive Dashboard & Calendar]
+    UI --> Mentor[Mentorship Workspace & Chat Portal]
 ```
 
 ---
 
-## ✨ Features & What Is Completed
+## ✨ Key Features (Version 1.0.0)
 
-### 🤖 1. Multi-Agent AI Planning Engine (Completed)
+### 🤖 1. Multi-Agent AI Planning Engine
 - **Goal Analyzer Agent**: Extracts target exams, target scores, and timeframe constraints.
 - **Subject Prioritizer Agent**: Analyzes topic weightage, weak areas, and confidence ratings.
 - **Study Planner Agent**: Generates structured multi-week topic roadmaps.
-- **Scheduler Agent**: Maps study topics into daily time slots matching the student's energy peak hours.
+- **Scheduler Agent**: Maps study topics into daily time slots matching student energy peak hours.
 - **Quiz Planner Agent**: Constructs diagnostic and review practice quizzes per subject.
 - **Revision Planner Agent**: Incorporates spaced-repetition revision cycles.
 - **Mock Test Planner Agent**: Schedules full-length simulated mock tests prior to exam dates.
-- **Progress Analyzer Agent**: Monitors check-ins and recalculates plans adaptively.
 - **Motivation Agent**: Delivers personalized encouragement strategies based on student performance.
 
-### 📡 2. Real-Time Streaming & Interactive UI (Completed)
-- **SSE Live Terminal Execution Monitor (`PlanningLoader`)**: Visual step-by-step terminal log output showing each AI agent executing in real time.
-- **Student Dashboard (`Dashboard.tsx`)**: High-level overview of upcoming study sessions, active streaks, level XP progress, and quick check-ins.
-- **Goal Intake Wizard (`GoalIntake.tsx`)**: Interactive multi-step form to collect study targets, available daily hours, and subject difficulties.
-- **Study Plan Viewer (`StudyPlanViewer.tsx`)**: Full weekly study schedule with task checkboxes, priority indicators, and module breakdowns.
-- **Visual Calendar Dashboard (`CalendarDashboard.tsx`)**: Time-blocked interactive calendar view with session details and quick reschedule options.
-- **Knowledge Mastery (`KnowledgeMastery.tsx`)**: Visual breakdown of subject & topic mastery percentages, confidence bars, and weak spot highlights.
-- **Interactive Quiz Engine (`QuizPlayer.tsx` & `QuizResult.tsx`)**: In-app practice quizzes with timers, instant scoring, and detailed AI explanations.
-- **AI Study Companion (`AICompanion.tsx`)**: Real-time AI chat mentor for instant academic doubt resolution, study tips, and topic summaries.
-- **Gamification & Trophy Case (`TrophyCase.tsx`)**: Leveling system with XP rewards, streak bonuses, achievement badges, and level progress bars.
-- **Adaptive Rescheduling (`ReschedulePreview.tsx`)**: Recalculates and adjusts future study blocks seamlessly when life happens and study blocks are missed.
+### 📊 2. AI Daily Planner Workspace
+- **Motion/Sunsama-Style Workspace**: Hero greeting card, today's focus checklist, tomorrow preview, collapsible week accordion, and space repetition stats.
+- **Goal Intake Wizard**: Natural language domain & topic inference, target score settings, and native study/break days selection.
+- **Interactive Calendar Suite**: Visual study blocks, drag-and-drop reschedule previews, color-coded event status, and calendar synchronization.
+- **Knowledge Mastery**: Subject mastery heatmaps, XP gamification, study streak counters, and performance analytics.
 
-### 🔐 3. Authentication & Backend Infrastructure (Completed)
-- **JWT & Cookie Authentication**: Secure sign-up/login, password hashing with `bcryptjs`, and role-based route protection.
-- **User Profile Management**: Captures learning styles, peak study hours, daily availability, and target target scores.
-- **Production Express Backend**: Modular domain-driven architecture (`src/modules/*`), Winston logger, rate-limiting, and standard error handling (`AppError`).
-- **MongoDB Schema Design**: Models for Users, Goals, Study Plans, Tasks, Quizzes, Mastery Tracks, Achievements, and Notifications.
+### 🎓 3. Mentorship System & Direct Messaging
+- **SaaS Mentorship Workflow**: Email invitation workflow, secure link generation, and system mentor selection.
+- **Mentor Dashboard**: Cohort roster management, student performance cards, and structured feedback publishing.
+- **Persistent Chat Portal**: Direct mentor-student direct messaging thread with real-time polling, conversation lists, message histories, and unread badges.
+
+### 🔐 4. Authentication & Backend Infrastructure
+- **JWT & Role-Based Access Control (RBAC)**: Secure access rules for `Student`, `Mentor`, and `Admin` roles.
+- **Express Backend**: Domain-driven architecture (`src/modules/*`), Winston logger, rate-limiting, and robust error management.
+- **MongoDB Data Layer**: Schema design for Users, Goals, Study Plans, Tasks, Quizzes, Mastery Tracks, Conversations, Messages, and Achievements.
 
 ---
 
@@ -81,15 +80,15 @@ flowchart TD
 ### **Frontend**
 - **Framework**: React 19 (TypeScript) + Vite
 - **State Management**: Redux Toolkit & TanStack React Query
-- **Styling**: Tailwind CSS with custom glassmorphism design system
+- **Styling**: Vanilla CSS + Tailwind CSS custom glassmorphism design system
 - **Icons & Charts**: Lucide React & Chart.js (`react-chartjs-2`)
 - **Routing**: React Router DOM v6
 
 ### **Backend**
-- **Runtime**: Node.js (ES Modules)
+- **Runtime**: Node.js
 - **Web Framework**: Express.js
 - **Database**: MongoDB with Mongoose ORM
-- **Real-Time Engine**: Server-Sent Events (SSE)
+- **Real-Time Engine**: Server-Sent Events (SSE) & Real-Time REST Polling
 - **Security & Utilities**: Helmet, CORS, Rate Limit, Cloudinary, Nodemailer, Winston
 
 ### **AI Layer**
@@ -98,58 +97,23 @@ flowchart TD
 
 ---
 
-## 📁 Project Structure
+## 📸 Screenshots
 
-```text
-autonomous-study-planner/
-├── client/                      # React Frontend App
-│   ├── src/
-│   │   ├── components/          # Reusable UI components & layouts
-│   │   ├── features/            # Feature-based Redux slices & API queries
-│   │   ├── pages/               # Page views (Dashboard, GoalIntake, Quiz, etc.)
-│   │   │   └── student/         # Student dashboard & AI views
-│   │   ├── services/            # API integration & SSE client
-│   │   ├── styles/              # Global CSS & Tailwind utilities
-│   │   └── types/               # TypeScript interfaces
-│   ├── package.json
-│   └── vite.config.ts
-│
-├── server/                      # Express Backend App
-│   ├── src/
-│   │   ├── modules/
-│   │   │   ├── aiPlanning/      # 🤖 Multi-Agent AI system & SSE routes
-│   │   │   ├── auth/            # Authentication & JWT security
-│   │   │   ├── calendar/        # Study schedule & event management
-│   │   │   ├── chat/            # AI Study Mentor chat logic
-│   │   │   ├── checkins/        # Daily check-in tracking
-│   │   │   ├── gamification/    # XP, levels, and achievements
-│   │   │   ├── goals/           # User study goal management
-│   │   │   ├── mastery/         # Topic mastery tracking
-│   │   │   ├── quizzes/         # AI Quiz generation & scoring
-│   │   │   ├── tasks/           # Study block tasks
-│   │   │   └── users/           # User profiles & preferences
-│   │   ├── routes/              # Central v1 API routes
-│   │   ├── services/            # Cron jobs, emails, file upload
-│   │   └── server.js            # Express application entry point
-│   └── package.json
-│
-├── shared/                      # Shared Types & Constants
-├── package.json                 # Monorepo Root Config (npm workspaces)
-└── .gitignore                   # Root Gitignore
-```
+*(Add screenshots of Student Dashboard, Goal Intake, Planning Loader, and Mentor Chat here)*
+
+| Student AI Daily Planner | Mentor Workspace Chat |
+|---|---|
+| *(Dashboard Screenshot)* | *(Chat Portal Screenshot)* |
 
 ---
 
-## 📌 What Needs to Be Completed (Roadmap)
+## 🔑 Demo Credentials (Local Testing)
 
-While the core multi-agent engine, dashboard, quizzes, AI companion, and gamification are fully functional, the following items are planned for upcoming releases:
-
-- [ ] **🗓️ External Calendar Integration**: 2-way sync with Google Calendar, Apple iCal, and Outlook.
-- [ ] **📈 Advanced Predictive Score Analytics**: Machine learning models predicting exam score based on current topic mastery velocity.
-- [ ] **🎙️ Audio & Voice Mode for AI Companion**: Real-time voice interaction with the AI study mentor.
-- [ ] **👥 Peer Study Groups & Community Leaderboards**: Social study challenges, group study rooms, and friend leaderboards.
-- [ ] **📱 Mobile PWA & Push Notifications**: Offline-first support and native mobile push alerts for upcoming study blocks.
-- [ ] **🧪 Comprehensive Automated E2E Test Suite**: Integration tests for AI agent responses, SSE streams, and critical user flows.
+| Role | Email | Password |
+|---|---|---|
+| **Student** | `student@example.com` | `password123` |
+| **Mentor** | `mentor@example.com` | `password123` |
+| **Admin** | `admin@example.com` | `password123` |
 
 ---
 
@@ -169,7 +133,7 @@ While the core multi-agent engine, dashboard, quizzes, AI companion, and gamific
    cd autonomous_study_planner
    ```
 
-2. **Install Workspace Dependencies**
+2. **Install Dependencies**
    ```bash
    npm install
    ```
@@ -193,20 +157,24 @@ While the core multi-agent engine, dashboard, quizzes, AI companion, and gamific
 
 4. **Run Development Servers**
    ```bash
-   # Terminal 1: Run Backend Server
-   npm run dev:server
+   # Run Backend Server (from server directory)
+   npm run dev
 
-   # Terminal 2: Run Frontend Client
-   npm run dev:client
+   # Run Frontend Client (from client directory)
+   npm run dev
    ```
 
-   Open your browser and navigate to `http://localhost:5173`.
+   Navigate to `http://localhost:5173` in your browser.
 
 ---
 
-## 🤝 Contributing
+## 📌 Future Roadmap
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/Amarjeetydv/autonomous_study_planner/issues).
+- [ ] **🗓️ External Calendar Integration**: 2-way sync with Google Calendar, Apple iCal, and Outlook.
+- [ ] **📈 Advanced Predictive Score Analytics**: Predictive models forecasting exam scores based on topic mastery velocity.
+- [ ] **🎙️ Audio & Voice Mode for AI Companion**: Real-time voice interaction with the AI study mentor.
+- [ ] **👥 Peer Study Groups & Community Leaderboards**: Social study challenges, group study rooms, and friend leaderboards.
+- [ ] **📱 Mobile PWA & Push Notifications**: Offline-first support and native mobile push alerts for upcoming study blocks.
 
 ---
 

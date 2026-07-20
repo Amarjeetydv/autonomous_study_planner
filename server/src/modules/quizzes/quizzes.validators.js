@@ -1,7 +1,7 @@
 const { body, param } = require('express-validator');
 
 const generateQuizValidators = [
-  body('subjectId').isMongoId().withMessage('Valid subjectId is required'),
+  body('subjectId').optional().isMongoId().withMessage('Valid subjectId is required'),
   body('topicId').optional().isMongoId().withMessage('topicId must be valid'),
   body('difficulty').optional().isIn(['Easy', 'Medium', 'Hard']).withMessage('Invalid difficulty level'),
   body('count').optional().isInt({ min: 1, max: 20 }).withMessage('count must be between 1 and 20'),

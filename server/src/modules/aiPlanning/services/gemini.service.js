@@ -1,6 +1,7 @@
 const { GoogleGenAI, HarmCategory, HarmBlockThreshold } = require('@google/genai');
 const env = require('../../../config/env');
 const ServiceUnavailableError = require('../../../utils/errors/ServiceUnavailableError');
+const logger = require('../../../config/logger');
 
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -20,8 +21,28 @@ const getGeminiClient = () => {
 };
 
 const isRetryableError = (error) => {
-  const status = error?.status || error?.response?.status || error?.code;
-  return [408, 429, 500, 502, 503, 504, 'ECONNRESET', 'ETIMEDOUT'].includes(status);
+  if (!error) return false;
+  const status = error.status || error.response?.status || error.code || error.cause?.code;
+  if ([408, 429, 500, 502, 503, 504, 'ECONNRESET', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT'].includes(status)) {
+    return true;
+  }
+  const msg = String(error.message || '').toLowerCase();
+  return msg.includes('fetch failed') || msg.includes('timeout') || msg.includes('high demand') || msg.includes('unavailable') || msg.includes('quota');
+};
+
+const extractRetryDelay = (error) => {
+  try {
+    const details = error?.details || error?.response?.details || [];
+    for (const detail of details) {
+      if (detail?.retryDelay) {
+        const seconds = parseFloat(String(detail.retryDelay).replace('s', ''));
+        if (!isNaN(seconds) && seconds > 0) return Math.ceil(seconds * 1000) + 1500;
+      }
+    }
+  } catch (e) {
+    // Ignore parsing issues
+  }
+  return 0;
 };
 
 const withTimeout = async (task, timeoutMs, timeoutMessage) => {
@@ -106,7 +127,10 @@ const runGeminiStage = async ({ stage, systemPrompt, userPrompt, model, temperat
         break;
       }
 
-      await sleep(500 * (attempt + 1));
+      const delayFromApi = extractRetryDelay(error);
+      const backoffDelay = delayFromApi > 0 ? delayFromApi : Math.pow(2, attempt + 1) * 1000;
+      logger.warn(`[Gemini API] Retrying stage '${stage}' (attempt ${attempt + 1}/${retries}) after ${backoffDelay}ms due to: ${error.message}`);
+      await sleep(backoffDelay);
     }
   }
 

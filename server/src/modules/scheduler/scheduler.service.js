@@ -230,10 +230,113 @@ const getHistory = async (studentId) => {
   return schedulerRepository.findHistory(studentId);
 };
 
+const findNextAvailableSlotsForTask = async (task, studentId) => {
+  const goal = await Goal.findOne({ studentId, status: 'active' });
+  if (!goal) {
+    throw new AppError('No active study goal found', 404);
+  }
+
+  const breakDays = goal.breakDays || [];
+  const dailyLimitMinutes = (goal.dailyStudyHours || 4) * 60;
+  
+  const options = [];
+  let dayOffset = 1; // start checking from tomorrow
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // We want to find 3 options
+  while (options.length < 3 && dayOffset < 30) { // search up to 30 days ahead
+    const checkDate = new Date(today);
+    checkDate.setDate(today.getDate() + dayOffset);
+
+    const dayName = checkDate.toLocaleDateString('en-US', { weekday: 'long' });
+    if (breakDays.includes(dayName)) {
+      dayOffset++;
+      continue;
+    }
+
+    // Sum estimated duration of tasks already scheduled for this day
+    const startOfDay = new Date(checkDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(checkDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingTasks = await DailyTask.find({
+      studentId,
+      scheduledDate: { $gte: startOfDay, $lte: endOfDay },
+      _id: { $ne: task._id }, // exclude this task itself
+      status: { $ne: 'Skipped' }
+    }).lean();
+
+    const currentDayLoad = existingTasks.reduce((acc, t) => acc + (t.estimatedDuration || 0), 0);
+    const taskMinutes = task.estimatedDuration || 60;
+
+    if (currentDayLoad + taskMinutes <= dailyLimitMinutes) {
+      let proposedStart = '18:00';
+      if (goal.preferredStudyTime === 'Morning') proposedStart = '09:00';
+      else if (goal.preferredStudyTime === 'Afternoon') proposedStart = '14:00';
+      else if (goal.preferredStudyTime === 'Evening') proposedStart = '18:00';
+      else if (goal.preferredStudyTime === 'Night') proposedStart = '21:00';
+
+      let startH = parseInt(proposedStart.split(':')[0], 10);
+      let isOverlap = true;
+      let safetyCount = 0;
+      
+      while (isOverlap && safetyCount < 10) {
+        const testStart = `${String(startH).padStart(2, '0')}:00`;
+        const endH = (startH + Math.floor(taskMinutes / 60)) % 24;
+        const endM = taskMinutes % 60;
+        const testEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+        
+        const hasOverlap = existingTasks.some(et => {
+          if (!et.plannedStartTime || !et.plannedEndTime) return false;
+          return (testStart >= et.plannedStartTime && testStart < et.plannedEndTime) ||
+                 (testEnd > et.plannedStartTime && testEnd <= et.plannedEndTime);
+        });
+
+        if (!hasOverlap) {
+          proposedStart = testStart;
+          isOverlap = false;
+        } else {
+          startH = (startH + 1) % 24;
+        }
+        safetyCount++;
+      }
+
+      const endH = (startH + Math.floor(taskMinutes / 60)) % 24;
+      const endM = taskMinutes % 60;
+      const proposedEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+      options.push({
+        plannedDate: checkDate,
+        plannedStartTime: proposedStart,
+        plannedEndTime: proposedEnd,
+        label: `${checkDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${formatTimeString(proposedStart)}`
+      });
+    }
+
+    dayOffset++;
+  }
+
+  return options;
+};
+
+const formatTimeString = (timeStr) => {
+  if (!timeStr) return '';
+  const parts = timeStr.split(':');
+  const h = parseInt(parts[0], 10);
+  if (isNaN(h)) return timeStr;
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  const m = parts[1] || '00';
+  return `${displayH}:${m} ${suffix}`;
+};
+
 module.exports = {
   recalculateSchedule,
   getActivePreview,
   applySchedule,
   rejectSchedule,
   getHistory,
+  findNextAvailableSlotsForTask,
 };

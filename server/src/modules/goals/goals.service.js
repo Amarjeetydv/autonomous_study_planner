@@ -2,6 +2,7 @@ const AppError = require('../../utils/AppError');
 const { buildListQuery, buildPagination } = require('../../services/query.service');
 const goalsRepository = require('./goals.repository');
 const Subject = require('../../models/Subject');
+const Goal = require('../../models/Goal');
 const { toGoalView, normalizeSubjectIds, normalizeBreakDays, normalizeVacationDays, buildGoalFilters, isFutureDate, goalHasActiveConflict } = require('./goals.utils');
 const { GOAL_STATUS } = require('./goals.constants');
 
@@ -35,19 +36,41 @@ const ensureGoalOwnershipOrAdmin = (goal, user) => {
   }
 };
 
+const mongoose = require('mongoose');
+
 const validateSubjectsExist = async (subjectIds = []) => {
   if (!Array.isArray(subjectIds) || subjectIds.length === 0) {
     return [];
   }
 
-  const uniqueIds = normalizeSubjectIds(subjectIds);
-  const subjects = await Subject.find({ _id: { $in: uniqueIds } }).select('_id').lean();
+  const resultIds = [];
+  for (const rawId of subjectIds) {
+    if (!rawId) continue;
 
-  if (subjects.length !== uniqueIds.length) {
-    throw new AppError('One or more selected subjects are invalid', 400);
+    if (mongoose.Types.ObjectId.isValid(rawId)) {
+      const existing = await Subject.findById(rawId).lean();
+      if (existing) {
+        resultIds.push(existing._id);
+        continue;
+      }
+    }
+
+    // Try finding by name or auto-create a Subject document so DB references remain valid
+    const nameStr = String(rawId).trim();
+    let subDoc = await Subject.findOne({ name: { $regex: new RegExp(`^${nameStr}$`, 'i') } });
+    if (!subDoc) {
+      subDoc = await Subject.create({
+        name: nameStr,
+        code: nameStr.substring(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'SUB101',
+        category: 'General',
+        difficulty: 'Intermediate',
+        color: '#6366F1'
+      });
+    }
+    resultIds.push(subDoc._id);
   }
 
-  return uniqueIds;
+  return resultIds;
 };
 
 const assertSubjectSubset = (subset = [], selected = []) => {
@@ -157,8 +180,16 @@ const createGoal = async ({ user, data }) => {
   const userId = user._id || user.id;
   const goalType = String(data.goalType).toUpperCase();
 
-  if (await goalHasActiveConflict({ studentId: userId, goalType })) {
-    throw new AppError('You already have an active goal in this category', 409);
+  const activeGoal = await Goal.findOne({ studentId: userId, goalType, status: 'active' }).lean();
+  if (activeGoal) {
+    const error = new AppError('You already have an active study goal in this category.', 409);
+    error.code = 'ACTIVE_GOAL_EXISTS';
+    error.data = {
+      goalId: activeGoal._id.toString(),
+      title: activeGoal.title,
+      category: activeGoal.goalType,
+    };
+    throw error;
   }
 
   const goal = await goalsRepository.create(await buildGoalData({ data: { ...data, goalType }, userId }));

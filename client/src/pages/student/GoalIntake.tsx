@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
-  ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, Sparkles, Bot, CheckCircle2
+  ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, AlertTriangle, Sparkles, Bot, CheckCircle2, Edit2
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
 import { toast } from '../../services/toast';
@@ -28,9 +28,17 @@ const EXAM_TYPES = [
 ];
 
 const PREFERRED_TIMES = ['Morning', 'Afternoon', 'Evening', 'Night', 'Flexible'];
-const LEARNING_STYLES = ['Visual', 'Reading', 'Hands-on', 'Video', 'Text', 'Mixed'];
-const DIFFICULTY_PREFS = ['Beginner', 'Intermediate', 'Advanced', 'Mixed'];
-const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const FULL_DAYS_MAP: { [key: string]: string } = {
+  Mon: 'Monday',
+  Tue: 'Tuesday',
+  Wed: 'Wednesday',
+  Thu: 'Thursday',
+  Fri: 'Friday',
+  Sat: 'Saturday',
+  Sun: 'Sunday'
+};
 
 export default function GoalIntake() {
   const navigate = useNavigate();
@@ -38,7 +46,6 @@ export default function GoalIntake() {
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [formError, setFormError] = useState('');
   const [manualSubjectOverride, setManualSubjectOverride] = useState(false);
-  const [isAnalyzingGoal, setIsAnalyzingGoal] = useState(false);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -46,20 +53,22 @@ export default function GoalIntake() {
   const [targetDate, setTargetDate] = useState('');
   const [dailyStudyHours, setDailyStudyHours] = useState(2);
   const [weeklyStudyDays, setWeeklyStudyDays] = useState(5);
-  const [preferredStudyTime, setPreferredStudyTime] = useState('Morning');
+  const [preferredStudyTime, setPreferredStudyTime] = useState('Evening');
   const [preferredSessionLengthMinutes, setPreferredSessionLengthMinutes] = useState(60);
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [domain, setDomain] = useState('Computer Science');
+  const [topic, setTopic] = useState('');
+  const [studyDays, setStudyDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  const [breakDays, setBreakDays] = useState<string[]>(['Saturday', 'Sunday']);
   const [strongSubjects, setStrongSubjects] = useState<string[]>([]);
   const [weakSubjects, setWeakSubjects] = useState<string[]>([]);
   const [prioritySubjects, setPrioritySubjects] = useState<string[]>([]);
   const [difficultyPreference, setDifficultyPreference] = useState('Intermediate');
   const [learningStyle, setLearningStyle] = useState('Mixed');
-  const [breakDays, setBreakDays] = useState<string[]>([]);
   const [motivation, setMotivation] = useState('');
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
 
   // Fetch available subjects
-  const { data: subjectsData, isLoading: isLoadingSubjects } = useQuery({
+  const { data: subjectsData } = useQuery({
     queryKey: ['subjects'],
     queryFn: async () => {
       const response = await apiClient.get('/subjects?limit=100');
@@ -67,24 +76,23 @@ export default function GoalIntake() {
     }
   });
 
-  // Dynamic AI Detection for Goal Title (returns confidence, topic, duration, subject)
+  // Dynamic AI Detection for Goal Title
   const detection = useMemo(() => {
     return parseGoalInput(title, subjectsData || []);
   }, [title, subjectsData]);
 
-  // Auto-fill target date or subject state when specific goal detected
+  // Sync detection results to domain & topic states unless overridden
   useEffect(() => {
-    if (detection.isSpecific) {
-      if (detection.subjectId && (!selectedSubjects.length || selectedSubjects.length === 1)) {
-        if (!selectedSubjects.includes(detection.subjectId)) {
-          setSelectedSubjects([detection.subjectId]);
-        }
-      }
-      if (detection.suggestedTargetDate && !targetDate) {
-        setTargetDate(detection.suggestedTargetDate);
-      }
+    if (detection.subject && !manualSubjectOverride) {
+      setDomain(detection.subject);
     }
-  }, [detection, targetDate]);
+    if (detection.topic && !manualSubjectOverride) {
+      setTopic(detection.topic);
+    }
+    if (detection.suggestedTargetDate && !targetDate) {
+      setTargetDate(detection.suggestedTargetDate);
+    }
+  }, [detection, manualSubjectOverride]);
 
   // Check for draft on mount
   useEffect(() => {
@@ -92,11 +100,11 @@ export default function GoalIntake() {
     if (draft) {
       try {
         const parsed = JSON.parse(draft);
-        if (parsed.title || parsed.selectedSubjects?.length) {
+        if (parsed.title) {
           setShowDraftModal(true);
         }
       } catch (err) {
-        // Invalid draft, ignore
+        // Invalid draft
       }
     }
   }, []);
@@ -105,16 +113,16 @@ export default function GoalIntake() {
   useEffect(() => {
     const state = {
       title, goalType, targetDate, dailyStudyHours, weeklyStudyDays,
-      preferredStudyTime, preferredSessionLengthMinutes, selectedSubjects,
-      strongSubjects, weakSubjects, prioritySubjects, difficultyPreference,
-      learningStyle, breakDays, motivation, timezone
+      preferredStudyTime, preferredSessionLengthMinutes, domain, topic,
+      studyDays, breakDays, strongSubjects, weakSubjects, prioritySubjects,
+      difficultyPreference, learningStyle, motivation, timezone
     };
     localStorage.setItem('asp_goal_intake_draft', JSON.stringify(state));
   }, [
     title, goalType, targetDate, dailyStudyHours, weeklyStudyDays,
-    preferredStudyTime, preferredSessionLengthMinutes, selectedSubjects,
-    strongSubjects, weakSubjects, prioritySubjects, difficultyPreference,
-    learningStyle, breakDays, motivation, timezone
+    preferredStudyTime, preferredSessionLengthMinutes, domain, topic,
+    studyDays, breakDays, strongSubjects, weakSubjects, prioritySubjects,
+    difficultyPreference, learningStyle, motivation, timezone
   ]);
 
   const loadDraft = () => {
@@ -127,15 +135,17 @@ export default function GoalIntake() {
         setTargetDate(d.targetDate || '');
         setDailyStudyHours(d.dailyStudyHours ?? 2);
         setWeeklyStudyDays(d.weeklyStudyDays ?? 5);
-        setPreferredStudyTime(d.preferredStudyTime || 'Morning');
+        setPreferredStudyTime(d.preferredStudyTime || 'Evening');
         setPreferredSessionLengthMinutes(d.preferredSessionLengthMinutes ?? 60);
-        setSelectedSubjects(d.selectedSubjects || []);
+        setDomain(d.domain || 'Computer Science');
+        setTopic(d.topic || '');
+        setStudyDays(d.studyDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+        setBreakDays(d.breakDays || ['Saturday', 'Sunday']);
         setStrongSubjects(d.strongSubjects || []);
         setWeakSubjects(d.weakSubjects || []);
         setPrioritySubjects(d.prioritySubjects || []);
         setDifficultyPreference(d.difficultyPreference || 'Intermediate');
         setLearningStyle(d.learningStyle || 'Mixed');
-        setBreakDays(d.breakDays || []);
         setMotivation(d.motivation || '');
         setTimezone(d.timezone || 'UTC');
       } catch (err) {
@@ -150,6 +160,15 @@ export default function GoalIntake() {
     setShowDraftModal(false);
   };
 
+  // Replace Goal Conflict Modal State
+  const [existingGoalConflict, setExistingGoalConflict] = useState<{
+    goalId: string;
+    title: string;
+    category: string;
+  } | null>(null);
+  const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
+  const [isArchivingGoal, setIsArchivingGoal] = useState(false);
+
   // Submit mutation
   const submitMutation = useMutation({
     mutationFn: async (payload: any) => {
@@ -161,17 +180,61 @@ export default function GoalIntake() {
       const genRes = await apiClient.post('/planner/generate', { goalId });
       return genRes.data.data;
     },
+    retry: false,
     onSuccess: (data) => {
       localStorage.removeItem('asp_goal_intake_draft');
       toast.success('Study Goal Created! Launching Multi-Agent Pipeline...', '🎉 Goal Created');
       navigate(`/planner/job/${data.jobId}`);
     },
     onError: (err: any) => {
+      if (err.response?.status === 409 || err.response?.data?.code === 'ACTIVE_GOAL_EXISTS') {
+        const conflictData = err.response?.data?.data || {};
+        setExistingGoalConflict({
+          goalId: conflictData.goalId || '',
+          title: conflictData.title || 'Active Study Plan',
+          category: conflictData.category || goalType,
+        });
+        return;
+      }
       const msg = err.response?.data?.message || 'Failed to submit study goal. Please try again.';
       setFormError(msg);
       toast.error(msg, 'Generation Error');
     }
   });
+
+  const handleContinueExistingPlan = async () => {
+    if (!existingGoalConflict?.goalId) {
+      navigate('/dashboard');
+      return;
+    }
+    try {
+      const res = await apiClient.get(`/planner?goalId=${existingGoalConflict.goalId}&limit=1`);
+      const plans = res.data?.data?.items || res.data?.items || [];
+      if (plans.length > 0) {
+        navigate(`/planner/${plans[0].id || plans[0]._id}`);
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      navigate('/dashboard');
+    }
+  };
+
+  const handleConfirmReplaceAndSubmit = async () => {
+    if (!existingGoalConflict?.goalId) return;
+    setIsArchivingGoal(true);
+    try {
+      await apiClient.put(`/goals/${existingGoalConflict.goalId}/archive`);
+      toast.info('Archived previous active plan.', 'Goal Replaced');
+      setExistingGoalConflict(null);
+      setShowReplaceConfirm(false);
+      handleSubmit();
+    } catch (err: any) {
+      toast.error('Failed to archive existing plan. Please try again.', 'Archive Error');
+    } finally {
+      setIsArchivingGoal(false);
+    }
+  };
 
   const handleNext = () => {
     setFormError('');
@@ -189,13 +252,16 @@ export default function GoalIntake() {
         setFormError('Target date must be in the future.');
         return;
       }
+      if (!domain.trim()) {
+        setFormError('Please enter a learning domain.');
+        return;
+      }
+      if (!topic.trim()) {
+        setFormError('Please enter a learning topic.');
+        return;
+      }
 
-      // Show small loading state while parsing goal
-      setIsAnalyzingGoal(true);
-      setTimeout(() => {
-        setIsAnalyzingGoal(false);
-        setStep(2);
-      }, 500);
+      setStep(2);
       return;
     }
     if (step === 2) {
@@ -203,22 +269,12 @@ export default function GoalIntake() {
         setFormError('Daily study hours must be between 1 and 24.');
         return;
       }
-      if (weeklyStudyDays <= 0 || weeklyStudyDays > 7) {
-        setFormError('Weekly study days must be between 1 and 7.');
+      if (studyDays.length === 0) {
+        setFormError('Please select at least one study day.');
         return;
       }
+      setStep(3);
     }
-    if (step === 3) {
-      if (selectedSubjects.length === 0) {
-        if (subjectsData && subjectsData.length > 0) {
-          setSelectedSubjects([subjectsData[0].id]);
-        } else {
-          setFormError('Please select at least one subject to study.');
-          return;
-        }
-      }
-    }
-    setStep((prev) => prev + 1);
   };
 
   const handleBack = () => {
@@ -226,63 +282,24 @@ export default function GoalIntake() {
     setStep((prev) => prev - 1);
   };
 
-  const toggleSubjectSelect = (id: string) => {
-    if (selectedSubjects.includes(id)) {
-      setSelectedSubjects(selectedSubjects.filter((sid) => sid !== id));
-      setStrongSubjects(strongSubjects.filter((sid) => sid !== id));
-      setWeakSubjects(weakSubjects.filter((sid) => sid !== id));
-      setPrioritySubjects(prioritySubjects.filter((sid) => sid !== id));
-    } else {
-      setSelectedSubjects([...selectedSubjects, id]);
-    }
-  };
-
-  const toggleClassification = (id: string, listType: 'strong' | 'weak' | 'priority') => {
-    if (!selectedSubjects.includes(id)) return;
-
-    if (listType === 'strong') {
-      if (strongSubjects.includes(id)) {
-        setStrongSubjects(strongSubjects.filter((sid) => sid !== id));
-      } else {
-        setStrongSubjects([...strongSubjects, id]);
-        setWeakSubjects(weakSubjects.filter((sid) => sid !== id)); // cannot be strong and weak
-      }
-    } else if (listType === 'weak') {
-      if (weakSubjects.includes(id)) {
-        setWeakSubjects(weakSubjects.filter((sid) => sid !== id));
-      } else {
-        setWeakSubjects([...weakSubjects, id]);
-        setStrongSubjects(strongSubjects.filter((sid) => sid !== id)); // cannot be weak and strong
-      }
-    } else if (listType === 'priority') {
-      if (prioritySubjects.includes(id)) {
-        setPrioritySubjects(prioritySubjects.filter((sid) => sid !== id));
-      } else {
-        setPrioritySubjects([...prioritySubjects, id]);
-      }
-    }
-  };
-
-  const toggleBreakDay = (day: string) => {
-    if (breakDays.includes(day)) {
-      setBreakDays(breakDays.filter((d) => d !== day));
-    } else {
-      setBreakDays([...breakDays, day]);
-    }
-  };
-
   const handleSubmit = () => {
+    if (submitMutation.isPending) return;
     setFormError('');
+    if (!domain.trim()) {
+      setFormError('Please enter a learning domain.');
+      return;
+    }
+
     const payload = {
       title,
       goalType,
       targetDate,
-      currentLevel: 'Intermediate', // default mapping to align with schema validators
+      currentLevel: 'Intermediate',
       dailyStudyHours: Number(dailyStudyHours),
       weeklyStudyDays: Number(weeklyStudyDays),
       preferredStudyTime,
       preferredSessionLengthMinutes: Number(preferredSessionLengthMinutes),
-      selectedSubjects,
+      selectedSubjects: [domain.trim()],
       strongSubjects,
       weakSubjects,
       prioritySubjects,
@@ -304,24 +321,32 @@ export default function GoalIntake() {
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-96 h-96 rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none"></div>
 
       {/* Header */}
-      <div className="max-w-3xl mx-auto w-full z-10 text-center mb-8">
-        <h1 className="text-3xl font-extrabold text-gradient">Set Your Study Goal</h1>
-        <p className="text-slate-400 text-sm mt-1">Configure your personalized milestones to let our AI construct your plan.</p>
+      <div className="sm:mx-auto sm:w-full sm:max-w-md z-10 text-center mb-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs font-bold mb-4">
+          <Bot className="h-4 w-4" />
+          Intelligent AI Planner
+        </div>
+        <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+          Set Your Goal
+        </h1>
+        <p className="mt-2 text-sm text-slate-400">
+          Describe what you want to master. Notion AI builds the schedule.
+        </p>
       </div>
 
       {/* Wizard Panel */}
-      <div className="max-w-3xl mx-auto w-full z-10 glass-panel rounded-2xl p-8 border border-slate-800 shadow-2xl flex-1 flex flex-col justify-between">
+      <div className="max-w-2xl mx-auto w-full z-10 glass-panel rounded-2xl p-8 border border-slate-800 shadow-2xl flex-1 flex flex-col justify-between">
         <div>
           {/* Progress Indicator */}
           <div className="mb-8">
             <div className="flex justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              <span>Step {step} of 5</span>
-              <span>{Math.round((step / 5) * 100)}% Complete</span>
+              <span>Step {step} of 3</span>
+              <span>{Math.round((step / 3) * 100)}% Complete</span>
             </div>
-            <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-brand-500 transition-all duration-300 rounded-full" 
-                style={{ width: `${(step / 5) * 100}%` }}
+                style={{ width: `${(step / 3) * 100}%` }}
               ></div>
             </div>
           </div>
@@ -333,14 +358,17 @@ export default function GoalIntake() {
             </div>
           )}
 
-          {/* STEP 1: Core Goal Details */}
+          {/* STEP 1: Conversational Intake */}
           {step === 1 && (
             <div className="space-y-6">
-              <h2 className="text-xl font-bold text-white mb-4">1. What are you preparing for?</h2>
-              
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold text-white">1. What are you studying for?</h2>
+                <p className="text-xs text-slate-400">Enter a topic or exam goal, and Notion AI will extract details.</p>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                  Goal Title / Name
+                  Study Goal Title
                 </label>
                 <input
                   type="text"
@@ -348,24 +376,74 @@ export default function GoalIntake() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="block w-full rounded-xl border border-slate-800 bg-slate-900/50 py-3 px-4 text-sm text-slate-100 outline-none transition focus:border-brand-500 focus:bg-slate-900"
-                  placeholder="e.g. Prepare Probability in 1 week, Learn DBMS Normalization, Master React Hooks"
+                  placeholder="e.g. Master permutation in aptitude, Learn React Hooks, Master DBMS"
                 />
-                <span className="text-[11px] text-slate-500 mt-1 block">
-                  Describe what you want to learn in natural language.
-                </span>
               </div>
 
-              {isAnalyzingGoal && (
-                <div className="flex flex-col items-center justify-center py-8 space-y-3 rounded-2xl bg-slate-900/40 border border-brand-500/20">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-2xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-400">
-                      <Bot className="w-6 h-6 animate-bounce" />
+              {/* Dynamic AI Detection Feedback Card */}
+              {title.trim().length > 3 && !manualSubjectOverride && (detection.subject || detection.topic) && (
+                <div className="p-4 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="w-5 h-5 text-brand-400 shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-brand-400">
+                          We recognized your learning topic
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">
+                          Auto Inferred
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-white mt-1">
+                        Domain: <strong className="text-brand-300">{domain}</strong>
+                        {topic && ` | Topic: ${topic}`}
+                      </p>
+                      {detection.duration && (
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Suggested duration: <strong className="text-emerald-400">{detection.duration} Days</strong>
+                        </p>
+                      )}
                     </div>
-                    <Sparkles className="w-4 h-4 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
                   </div>
-                  <div className="text-center">
-                    <h4 className="font-bold text-sm text-white">AI Assistant Analyzing Goal...</h4>
-                    <p className="text-[11px] text-slate-400">Extracting focus topics & duration</p>
+                  <button
+                    type="button"
+                    onClick={() => setManualSubjectOverride(true)}
+                    className="text-xs text-brand-400 hover:text-brand-300 font-bold flex items-center gap-1 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    Edit
+                  </button>
+                </div>
+              )}
+
+              {/* Manual Subject inputs (shown when override is active or confidence is low) */}
+              {(manualSubjectOverride || (!detection.subject && title.trim().length > 3)) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-xl bg-slate-900/20 border border-slate-800">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                      Learning Domain
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={domain}
+                      onChange={(e) => setDomain(e.target.value)}
+                      placeholder="e.g. Aptitude, Web Development, CS"
+                      className="block w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-4 text-sm text-slate-100 outline-none transition focus:border-brand-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                      Learning Topic
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={topic}
+                      onChange={(e) => setTopic(e.target.value)}
+                      placeholder="e.g. Permutation & Combination, React Hooks"
+                      className="block w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 px-4 text-sm text-slate-100 outline-none transition focus:border-brand-500"
+                    />
                   </div>
                 </div>
               )}
@@ -373,7 +451,7 @@ export default function GoalIntake() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Exam / Prep Category
+                    Prep Category
                   </label>
                   <select
                     value={goalType}
@@ -388,7 +466,7 @@ export default function GoalIntake() {
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Target Date
+                    Target Completion Date
                   </label>
                   <input
                     type="date"
@@ -399,26 +477,16 @@ export default function GoalIntake() {
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                  Timezone
-                </label>
-                <input
-                  type="text"
-                  disabled
-                  value={timezone}
-                  className="block w-full rounded-xl border border-slate-900 bg-slate-950/60 py-3 px-4 text-sm text-slate-500 cursor-not-allowed"
-                />
-                <span className="text-[11px] text-slate-500 mt-1 block">Automatically matched to local browser configuration.</span>
-              </div>
             </div>
           )}
 
-          {/* STEP 2: Schedules */}
+          {/* STEP 2: Dedicated Study Schedule Preferences */}
           {step === 2 && (
             <div className="space-y-6">
-              <h2 className="text-xl font-bold text-white mb-4">2. Design your daily dedication</h2>
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold text-white">2. Your Schedule Preference</h2>
+                <p className="text-xs text-slate-400">Configure how much time you dedicate each session.</p>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -436,26 +504,73 @@ export default function GoalIntake() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Weekly Study Days (1-7)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="7"
-                    required
-                    value={weeklyStudyDays}
-                    onChange={(e) => setWeeklyStudyDays(Number(e.target.value))}
-                    className="block w-full rounded-xl border border-slate-800 bg-slate-900/50 py-3 px-4 text-sm text-slate-100 outline-none transition focus:border-brand-500 focus:bg-slate-900"
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                      Study Days
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DAYS_OF_WEEK.map((day) => {
+                        const isSelected = studyDays.includes(day);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              let nextStudyDays = [...studyDays];
+                              if (isSelected) {
+                                if (studyDays.length > 1) {
+                                  nextStudyDays = studyDays.filter(d => d !== day);
+                                }
+                              } else {
+                                nextStudyDays = [...studyDays, day];
+                              }
+                              setStudyDays(nextStudyDays);
+                              setWeeklyStudyDays(nextStudyDays.length);
+                              setBreakDays(DAYS_OF_WEEK.filter(d => !nextStudyDays.includes(d)).map(d => FULL_DAYS_MAP[d]));
+                            }}
+                            className={`w-9 h-9 rounded-xl text-xs font-bold transition border flex items-center justify-center ${
+                              isSelected 
+                                ? 'bg-brand-500 border-brand-500 text-white shadow-lg shadow-brand-500/25' 
+                                : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                      Break Days
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DAYS_OF_WEEK.map((day) => {
+                        const isBreak = !studyDays.includes(day);
+                        return (
+                          <div
+                            key={day}
+                            className={`w-9 h-9 rounded-xl text-xs font-bold border transition flex items-center justify-center ${
+                              isBreak 
+                                ? 'bg-slate-900/80 border-slate-700 text-emerald-400' 
+                                : 'bg-slate-950/20 border-slate-900 text-slate-600 pointer-events-none'
+                            }`}
+                          >
+                            {day}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Preferred Time of Day
+                    Preferred Time Window
                   </label>
                   <select
                     value={preferredStudyTime}
@@ -482,328 +597,111 @@ export default function GoalIntake() {
                     onChange={(e) => setPreferredSessionLengthMinutes(Number(e.target.value))}
                     className="block w-full rounded-xl border border-slate-800 bg-slate-900/50 py-3 px-4 text-sm text-slate-100 outline-none transition focus:border-brand-500 focus:bg-slate-900"
                   />
-                  <span className="text-[10px] text-slate-500 mt-1 block">Specify study block length (e.g. 60 or 90 mins).</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP 3: Subject Selection & Classification */}
+          {/* STEP 3: summary, dynamic subject overrides, and launch */}
           {step === 3 && (
             <div className="space-y-6">
-              {detection.confidence >= 0.75 && !manualSubjectOverride ? (
-                /* Human-Friendly AI Goal Summary Card (Confidence >= 0.75) */
-                <div className="glass-panel rounded-2xl p-8 border border-brand-500/30 bg-gradient-to-b from-slate-900/90 to-slate-950 space-y-6 shadow-2xl">
-                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 rounded-2xl bg-brand-500/20 border border-brand-500/30 text-brand-400">
-                        <Bot className="h-6 w-6" />
-                      </div>
+              <h2 className="text-xl font-bold text-white mb-4">Ready to Generate Your Study Plan</h2>
+
+              <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 space-y-5">
+                <div className="border-b border-slate-800/80 pb-4 flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-brand-400 tracking-widest block">Goal</span>
+                    <h3 className="text-lg font-bold text-white mt-0.5">{title}</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Category: <strong className="text-slate-200">{EXAM_TYPES.find(t => t.value === goalType)?.label}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Intelligent Auto-Detected Subject Display */}
+                {!manualSubjectOverride ? (
+                  <div className="bg-brand-500/10 border border-brand-500/20 rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                       <div>
-                        <h2 className="text-xl font-extrabold text-white">Goal Summary</h2>
-                        <p className="text-xs text-slate-400">We structured your learning focus automatically.</p>
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
+                          We recognized your learning topic
+                        </span>
+                        <p className="text-sm font-semibold text-white mt-0.5">
+                          Domain: <strong className="text-brand-300">{domain}</strong> | Topic: <strong className="text-brand-300">{topic}</strong>
+                        </p>
                       </div>
                     </div>
-                    <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      AI Configured
-                    </span>
-                  </div>
-
-                  <div className="space-y-5">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Goal</span>
-                      <p className="text-lg font-extrabold text-white">{title}</p>
-                    </div>
-
-                    <div className="border-t border-slate-800/80 pt-4">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">We'll build your study plan for</span>
-                      <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-brand-950/60 border border-brand-500/40 text-brand-300 text-sm font-bold shadow-inner">
-                        <span className="text-brand-400 text-base">•</span>
-                        {detection.topic || detection.subject}
-                      </div>
-                    </div>
-
-                    {detection.duration && (
-                      <div className="border-t border-slate-800/80 pt-4">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Estimated duration</span>
-                        <p className="text-sm font-extrabold text-emerald-400">{detection.duration} Days</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
                     <button
                       type="button"
                       onClick={() => setManualSubjectOverride(true)}
-                      className="text-xs text-slate-400 hover:text-slate-200 font-semibold flex items-center gap-1.5 transition"
+                      className="text-xs text-brand-400 hover:text-brand-300 font-bold underline"
                     >
-                      ✏ Edit Goal
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold text-sm px-6 py-3 rounded-xl transition shadow-lg shadow-brand-500/20"
-                    >
-                      ✓ Looks Good
-                      <ArrowRight className="h-4 w-4" />
+                      Edit
                     </button>
                   </div>
-                </div>
-              ) : (
-                /* Display Normal Subject Selection Screen for Generic Goals (< 0.75) or Manual Edit */
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center mb-2">
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900/20 border border-slate-800 rounded-xl p-4">
                     <div>
-                      <h2 className="text-xl font-bold text-white">3. Curate your subjects list</h2>
-                      <p className="text-xs text-slate-400">Select the subjects you want to include in your study plan.</p>
+                      <label className="block text-xs text-slate-400 font-semibold mb-1">Learning Domain</label>
+                      <input
+                        type="text"
+                        value={domain}
+                        onChange={(e) => setDomain(e.target.value)}
+                        className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-brand-500"
+                      />
                     </div>
-                    <span className="text-xs text-brand-400 font-semibold">{selectedSubjects.length} Selected</span>
+                    <div>
+                      <label className="block text-xs text-slate-400 font-semibold mb-1">Learning Topic</label>
+                      <input
+                        type="text"
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-brand-500"
+                      />
+                    </div>
                   </div>
+                )}
 
-                  {isLoadingSubjects ? (
-                    <div className="flex justify-center items-center py-12">
-                      <Loader2 className="h-8 w-8 animate-spin text-brand-500" />
-                    </div>
-                  ) : (
-                    <div className="max-h-[350px] overflow-y-auto pr-2 space-y-4">
-                      {subjectsData && subjectsData.length > 0 ? (
-                        subjectsData.map((sub) => {
-                          const isSelected = selectedSubjects.includes(sub.id);
-                          const isStrong = strongSubjects.includes(sub.id);
-                          const isWeak = weakSubjects.includes(sub.id);
-                          const isPriority = prioritySubjects.includes(sub.id);
-
-                          return (
-                            <div 
-                              key={sub.id} 
-                              className={`p-4 rounded-xl border transition-all ${
-                                isSelected ? 'bg-slate-900/80 border-slate-700' : 'bg-slate-900/20 border-slate-900/80'
-                              }`}
-                            >
-                              <div className="flex justify-between items-center mb-2">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => toggleSubjectSelect(sub.id)}
-                                    className="rounded text-brand-500 focus:ring-brand-500 bg-slate-950 border-slate-800"
-                                  />
-                                  <div>
-                                    <span className="font-bold text-sm text-white block">{sub.name}</span>
-                                    <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
-                                      {sub.code} • {sub.category}
-                                    </span>
-                                  </div>
-                                </label>
-                                <span 
-                                  className="text-[10px] px-2 py-0.5 rounded uppercase font-semibold tracking-wider text-slate-400 bg-slate-800"
-                                  style={{ color: sub.color }}
-                                >
-                                  {sub.difficulty}
-                                </span>
-                              </div>
-
-                              {/* Classification switches */}
-                              {isSelected && (
-                                <div className="flex gap-2 mt-3 pt-2 border-t border-slate-800/60">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleClassification(sub.id, 'strong')}
-                                    className={`text-[10px] px-3 py-1.5 rounded-lg border font-semibold transition ${
-                                      isStrong 
-                                        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/40' 
-                                        : 'bg-slate-950/50 text-slate-400 border-slate-800 hover:border-slate-700'
-                                    }`}
-                                  >
-                                    Strong Subject
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleClassification(sub.id, 'weak')}
-                                    className={`text-[10px] px-3 py-1.5 rounded-lg border font-semibold transition ${
-                                      isWeak 
-                                        ? 'bg-amber-950/40 text-amber-400 border-amber-500/40' 
-                                        : 'bg-slate-950/50 text-slate-400 border-slate-800 hover:border-slate-700'
-                                    }`}
-                                  >
-                                    Weak Subject
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleClassification(sub.id, 'priority')}
-                                    className={`text-[10px] px-3 py-1.5 rounded-lg border font-semibold transition ${
-                                      isPriority 
-                                        ? 'bg-brand-950/40 text-brand-400 border-brand-500/40' 
-                                        : 'bg-slate-950/50 text-slate-400 border-slate-800 hover:border-slate-700'
-                                    }`}
-                                  >
-                                    Priority
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="text-center py-6 text-slate-500 text-sm">
-                          No subjects configured in system. Please run database seeding.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 4: Preferences & Customizations */}
-          {step === 4 && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold text-white mb-4">4. Personalize study characteristics</h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Difficulty Level Preference
-                  </label>
-                  <select
-                    value={difficultyPreference}
-                    onChange={(e) => setDifficultyPreference(e.target.value)}
-                    className="block w-full rounded-xl border border-slate-800 bg-slate-900/50 py-3 px-4 text-sm text-slate-100 outline-none transition focus:border-brand-500 focus:bg-slate-900"
-                  >
-                    {DIFFICULTY_PREFS.map((pref) => (
-                      <option key={pref} value={pref}>{pref}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Learning Style
-                  </label>
-                  <select
-                    value={learningStyle}
-                    onChange={(e) => setLearningStyle(e.target.value)}
-                    className="block w-full rounded-xl border border-slate-800 bg-slate-900/50 py-3 px-4 text-sm text-slate-100 outline-none transition focus:border-brand-500 focus:bg-slate-900"
-                  >
-                    {LEARNING_STYLES.map((style) => (
-                      <option key={style} value={style}>{style}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
-                  Preferred Break Days
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {WEEKDAYS.map((day) => {
-                    const isSelected = breakDays.includes(day);
-                    return (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => toggleBreakDay(day)}
-                        className={`text-xs px-3 py-2 rounded-xl border font-medium transition ${
-                          isSelected 
-                            ? 'bg-brand-500 text-white border-brand-500' 
-                            : 'bg-slate-900/40 text-slate-400 border-slate-800 hover:border-slate-700'
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                  Motivation Statement (Optional)
-                </label>
-                <textarea
-                  value={motivation}
-                  onChange={(e) => setMotivation(e.target.value)}
-                  rows={3}
-                  className="block w-full rounded-xl border border-slate-800 bg-slate-900/50 py-3 px-4 text-sm text-slate-100 outline-none transition focus:border-brand-500 focus:bg-slate-900 resize-none"
-                  placeholder="Share what drives you to finish this plan..."
-                />
-              </div>
-            </div>
-          )}
-
-          {/* STEP 5: Review & Submit */}
-          {step === 5 && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold text-white mb-4">5. Review details before compiling</h2>
-
-              <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 space-y-4">
-                <div className="border-b border-slate-800/80 pb-4">
-                  <span className="text-[10px] uppercase font-bold text-brand-400 tracking-widest">Goal Focus</span>
-                  <h3 className="text-xl font-bold text-white mt-1">{title}</h3>
-                  <span className="text-xs text-slate-400">{EXAM_TYPES.find(t => t.value === goalType)?.label}</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-4 text-xs border-t border-slate-800/80 pt-4">
                   <div>
-                    <span className="text-slate-500 text-xs block">Target Completion Date</span>
+                    <span className="text-slate-500 block">Target Completion Date</span>
                     <span className="font-semibold text-slate-200">{targetDate}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-xs block">Daily Commited Hours</span>
+                    <span className="text-slate-500 block">Daily Dedicated Hours</span>
                     <span className="font-semibold text-slate-200">{dailyStudyHours} hours / day</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-xs block">Preferred Window</span>
+                    <span className="text-slate-500 block">Preferred Study Window</span>
                     <span className="font-semibold text-slate-200">{preferredStudyTime}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-xs block">Session Block length</span>
+                    <span className="text-slate-500 block">Session Block Length</span>
                     <span className="font-semibold text-slate-200">{preferredSessionLengthMinutes} Minutes</span>
                   </div>
-                </div>
-
-                <div className="border-t border-slate-800/80 pt-4">
-                  <span className="text-slate-500 text-xs block mb-2">Selected Subjects ({selectedSubjects.length})</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedSubjects.map((sid) => {
-                      const sub = subjectsData?.find((s) => s.id === sid);
-                      if (!sub) return null;
-                      const isStrong = strongSubjects.includes(sid);
-                      const isWeak = weakSubjects.includes(sid);
-                      return (
-                        <span 
-                          key={sid} 
-                          className="text-[10px] px-2 py-1 rounded bg-slate-800 text-slate-300 font-medium flex items-center gap-1 border border-slate-800"
-                        >
-                          {sub.name}
-                          {isStrong && <span className="text-emerald-400 font-bold">(Strong)</span>}
-                          {isWeak && <span className="text-amber-400 font-bold">(Weak)</span>}
-                        </span>
-                      );
-                    })}
+                  <div>
+                    <span className="text-slate-500 block">Study Days</span>
+                    <span className="font-semibold text-slate-200">{studyDays.join(' ')}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Break Days</span>
+                    <span className="font-semibold text-slate-200">
+                      {breakDays.map(d => Object.keys(FULL_DAYS_MAP).find(k => FULL_DAYS_MAP[k] === d) || d).join(' ')}
+                    </span>
                   </div>
                 </div>
 
-                {(breakDays.length > 0 || motivation) && (
-                  <div className="border-t border-slate-800/80 pt-4 space-y-3">
-                    {breakDays.length > 0 && (
-                      <div>
-                        <span className="text-slate-500 text-xs block mb-1">Rest Days</span>
-                        <span className="text-xs text-slate-400">{breakDays.join(', ')}</span>
-                      </div>
-                    )}
-                    {motivation && (
-                      <div>
-                        <span className="text-slate-500 text-xs block mb-1">Motivation Code</span>
-                        <p className="text-xs text-slate-400 italic">"{motivation}"</p>
-                      </div>
-                    )}
+                <div className="border-t border-slate-800/80 pt-4 space-y-2 text-xs text-slate-400">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-2">We'll generate:</span>
+                  <div className="grid grid-cols-2 gap-2 text-slate-300">
+                    <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> Personalized schedule</span>
+                    <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> Revision plan</span>
+                    <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> Practice questions</span>
+                    <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> Mock tests</span>
+                    <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-400" /> Buffer days</span>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}
@@ -825,7 +723,7 @@ export default function GoalIntake() {
             <div />
           )}
 
-          {step < 5 ? (
+          {step < 3 ? (
             <button
               type="button"
               onClick={handleNext}
@@ -844,12 +742,12 @@ export default function GoalIntake() {
               {submitMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving Goal...
+                  Activating AI Agents...
                 </>
               ) : (
                 <>
-                  Confirm & Submit
-                  <Check className="h-4 w-4" />
+                  Generate My Study Plan
+                  <Sparkles className="h-4 w-4 text-amber-300" />
                 </>
               )}
             </button>
@@ -879,6 +777,92 @@ export default function GoalIntake() {
                 Discard Draft
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Goal Conflict Resolution Modal */}
+      {existingGoalConflict && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 max-w-md w-full space-y-5 shadow-2xl">
+            {!showReplaceConfirm ? (
+              <>
+                <div className="flex items-center gap-3 border-b border-slate-900 pb-3">
+                  <div className="p-2.5 rounded-xl bg-amber-950/80 border border-amber-500/30 text-amber-400">
+                    <AlertTriangle className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-white text-base">Active Goal Found</h3>
+                    <p className="text-xs text-slate-400">You already have an active study plan.</p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800 space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Existing Active Goal</span>
+                  <p className="text-sm font-extrabold text-white">{existingGoalConflict.title}</p>
+                  <span className="text-[10px] font-semibold text-brand-400">Category: {existingGoalConflict.category}</span>
+                </div>
+
+                <p className="text-xs text-slate-300">
+                  What would you like to do?
+                </p>
+
+                <div className="flex flex-col gap-2.5 pt-2">
+                  <button
+                    onClick={handleContinueExistingPlan}
+                    className="w-full py-2.5 px-4 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs transition shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
+                  >
+                    Continue Existing Plan
+                  </button>
+                  <button
+                    onClick={() => setShowReplaceConfirm(true)}
+                    className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-amber-400 font-bold text-xs transition"
+                  >
+                    Replace Existing Plan
+                  </button>
+                  <button
+                    onClick={() => setExistingGoalConflict(null)}
+                    className="w-full py-2 px-4 rounded-xl bg-transparent text-slate-400 hover:text-white font-semibold text-xs transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 border-b border-slate-900 pb-3">
+                  <div className="p-2.5 rounded-xl bg-red-950/80 border border-red-500/30 text-red-400">
+                    <AlertTriangle className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-white text-base">Confirm Replace Goal</h3>
+                    <p className="text-xs text-slate-400">This action will modify your active status.</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/40 p-4 rounded-xl border border-slate-800">
+                  This will archive your current active plan ("<strong className="text-white">{existingGoalConflict.title}</strong>") and generate a new one.
+                </p>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    disabled={isArchivingGoal}
+                    onClick={() => setShowReplaceConfirm(false)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-bold text-slate-400"
+                  >
+                    Back
+                  </button>
+                  <button
+                    disabled={isArchivingGoal}
+                    onClick={handleConfirmReplaceAndSubmit}
+                    className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-lg shadow-red-600/20 flex items-center gap-2"
+                  >
+                    {isArchivingGoal ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Confirm Replace
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

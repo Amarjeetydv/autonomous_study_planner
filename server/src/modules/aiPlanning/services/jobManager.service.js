@@ -2,7 +2,7 @@ const PlanningJob = require('../../../models/PlanningJob');
 const AIPlan = require('../../../models/AIPlan');
 const aiPlanningService = require('../aiPlanning.service');
 const logger = require('../../../config/logger');
-const AppError = require('../../../utils/errors/AppError');
+const AppError = require('../../../utils/AppError');
 const eventEmitter = require('../../../services/eventEmitter.service');
 
 class JobManager {
@@ -67,8 +67,8 @@ class JobManager {
       
       const timeoutPromise = new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
-          reject(new AppError('Planning timeout exceeded 30 seconds', 408));
-        }, 30000);
+          reject(new AppError('Planning timeout exceeded 90 seconds', 408));
+        }, 90000);
       });
 
       const planPromise = aiPlanningService.generatePlan({

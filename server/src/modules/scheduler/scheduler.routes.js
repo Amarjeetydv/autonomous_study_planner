@@ -7,6 +7,8 @@ const {
   applyController,
   rejectController,
   getHistoryController,
+  rescheduleSkippedController,
+  acceptRescheduleController,
 } = require('./scheduler.controller');
 
 const router = express.Router();
@@ -18,5 +20,7 @@ router.get('/preview', ...schedulerAccess, getPreviewController);
 router.post('/apply', ...schedulerAccess, applyController);
 router.post('/reject', ...schedulerAccess, rejectController);
 router.get('/history', ...schedulerAccess, getHistoryController);
+router.post('/reschedule-skipped', ...schedulerAccess, rescheduleSkippedController);
+router.post('/accept-reschedule', ...schedulerAccess, acceptRescheduleController);
 
 module.exports = router;

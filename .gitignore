@@ -31,10 +31,14 @@ yarn-error.log*
 
 # Editor & System files
 .vscode/
+.vscode/settings.json
 .idea/
 .DS_Store
 Thumbs.db
 
-# Cache & Temp
+# Cache, Coverage & Temp
+coverage/
+uploads/
+temp/
 .eslintcache
 *.tsbuildinfo

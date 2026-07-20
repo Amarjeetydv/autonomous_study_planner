@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const AppError = require('../../utils/AppError');
 const { buildListQuery, buildPagination } = require('../../services/query.service');
 const Goal = require('../../models/Goal');
@@ -49,11 +50,25 @@ const loadGoalContext = async ({ goalId, user }) => {
 
   ensureGoalAccess(goal, user);
 
-  const subjectIds = normalizeIdList([...(goal.selectedSubjects || []), ...(goal.strongSubjects || []), ...(goal.weakSubjects || []), ...(goal.prioritySubjects || [])]);
-  const [subjects, progressDocs] = await Promise.all([
-    subjectIds.length > 0 ? Subject.find({ _id: { $in: subjectIds } }).lean() : Promise.resolve([]),
+  const rawSubjectIds = [...(goal.selectedSubjects || []), ...(goal.strongSubjects || []), ...(goal.weakSubjects || []), ...(goal.prioritySubjects || [])];
+  const validObjectIds = rawSubjectIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+  const customNames = rawSubjectIds.filter(id => typeof id === 'string' && !mongoose.Types.ObjectId.isValid(id) && id.trim().length > 0);
+
+  const [dbSubjects, progressDocs] = await Promise.all([
+    validObjectIds.length > 0 ? Subject.find({ _id: { $in: validObjectIds } }).lean() : Promise.resolve([]),
     Progress.find({ studentId: goal.studentId, goalId: goal._id }).sort({ snapshotDate: -1 }).limit(10).lean(),
   ]);
+
+  const customSubjects = customNames.map(name => ({
+    _id: name,
+    id: name,
+    name: name,
+    code: name.substring(0, 6).toUpperCase().replace(/\s+/g, '') || 'SUB101',
+    category: 'General',
+    difficulty: 'Intermediate'
+  }));
+
+  const subjects = [...dbSubjects, ...customSubjects];
 
   return {
     goal,
@@ -100,6 +115,30 @@ const aggregateUsage = (stages = []) =>
     { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
   );
 
+const logger = require('../../config/logger');
+
+const executeStageWithTelemetry = async (stageName, fn, onProgress, progressVal) => {
+  const startTime = Date.now();
+  const startIso = new Date(startTime).toISOString();
+  logger.info(`[AI Pipeline] Stage '${stageName}' Started at ${startIso}`);
+  
+  try {
+    const result = await fn();
+    const endTime = Date.now();
+    const durationSec = ((endTime - startTime) / 1000).toFixed(2);
+    logger.info(`[AI Pipeline] Stage '${stageName}' Finished at ${new Date(endTime).toISOString()} | Duration: ${durationSec}s`);
+    if (onProgress && progressVal) {
+      await onProgress(stageName, progressVal);
+    }
+    return result;
+  } catch (err) {
+    const endTime = Date.now();
+    const durationSec = ((endTime - startTime) / 1000).toFixed(2);
+    logger.error(`[AI Pipeline] Stage '${stageName}' Failed at ${new Date(endTime).toISOString()} | Duration: ${durationSec}s | Error: ${err.message}`);
+    throw err;
+  }
+};
+
 const generatePlan = async ({ user, goalId, options = {}, onProgress = null }) => {
   const context = await loadGoalContext({ goalId, user });
   const { goal, progressDocs } = context;
@@ -109,23 +148,44 @@ const generatePlan = async ({ user, goalId, options = {}, onProgress = null }) =
   const timeoutMs = options.timeoutMs ?? AI_DEFAULTS.timeoutMs;
   const stream = Boolean(options.stream);
 
-  const goalAnalysisStage = await runGoalAnalyzerAgent({ goal, subjects: context.subjects, progress: progressDocs, model, temperature, retries, timeoutMs, stream });
-  if (onProgress) await onProgress('goalAnalyzer', 15);
+  const goalAnalysisStage = await executeStageWithTelemetry(
+    'goalAnalyzer',
+    () => runGoalAnalyzerAgent({ goal, subjects: context.subjects, progress: progressDocs, model, temperature, retries, timeoutMs, stream }),
+    onProgress, 15
+  );
 
-  const subjectPrioritizerStage = await runSubjectPrioritizerAgent({ goal, goalAnalysis: goalAnalysisStage.output, subjects: context.subjects, model, temperature, retries, timeoutMs, stream });
-  if (onProgress) await onProgress('subjectPrioritizer', 30);
+  const subjectPrioritizerStage = await executeStageWithTelemetry(
+    'subjectPrioritizer',
+    () => runSubjectPrioritizerAgent({ goal, goalAnalysis: goalAnalysisStage.output, subjects: context.subjects, model, temperature, retries, timeoutMs, stream }),
+    onProgress, 30
+  );
 
-  const schedulerStage = await runSchedulerAgent({ goal, goalAnalysis: goalAnalysisStage.output, studyPlan: subjectPrioritizerStage.output, model, temperature, retries, timeoutMs, stream });
+  // Parallelize Scheduler and Revision Planner (independent agents after Subject Prioritization)
+  const [schedulerStage, revisionStage] = await Promise.all([
+    executeStageWithTelemetry(
+      'scheduleGenerator',
+      () => runSchedulerAgent({ goal, goalAnalysis: goalAnalysisStage.output, studyPlan: subjectPrioritizerStage.output, model, temperature, retries, timeoutMs, stream })
+    ),
+    executeStageWithTelemetry(
+      'revisionPlanner',
+      () => runRevisionPlannerAgent({ goal, goalAnalysis: goalAnalysisStage.output, studyPlan: subjectPrioritizerStage.output, model, temperature, retries, timeoutMs, stream })
+    )
+  ]);
+
   if (onProgress) await onProgress('scheduleGenerator', 50);
-
-  const revisionStage = await runRevisionPlannerAgent({ goal, goalAnalysis: goalAnalysisStage.output, studyPlan: subjectPrioritizerStage.output, model, temperature, retries, timeoutMs, stream });
   if (onProgress) await onProgress('revisionPlanner', 70);
 
-  const mockTestStage = await runMockTestPlannerAgent({ goal, studyPlan: subjectPrioritizerStage.output, scheduler: schedulerStage.output, model, temperature, retries, timeoutMs, stream });
-  if (onProgress) await onProgress('mockTestPlanner', 90);
+  const mockTestStage = await executeStageWithTelemetry(
+    'mockTestPlanner',
+    () => runMockTestPlannerAgent({ goal, studyPlan: subjectPrioritizerStage.output, scheduler: schedulerStage.output, model, temperature, retries, timeoutMs, stream }),
+    onProgress, 90
+  );
 
-  const motivationStage = await runMotivationAgent({ goal, goalAnalysis: goalAnalysisStage.output, studyPlan: subjectPrioritizerStage.output, scheduler: schedulerStage.output, quizPlan: mockTestStage.output, progressAnalysis: {}, model, temperature, retries, timeoutMs, stream });
-  if (onProgress) await onProgress('motivation', 100);
+  const motivationStage = await executeStageWithTelemetry(
+    'motivation',
+    () => runMotivationAgent({ goal, goalAnalysis: goalAnalysisStage.output, studyPlan: subjectPrioritizerStage.output, scheduler: schedulerStage.output, quizPlan: mockTestStage.output, progressAnalysis: {}, model, temperature, retries, timeoutMs, stream }),
+    onProgress, 100
+  );
 
   const finalPlan = validateGeneratedPlan({
     studentId: goal.studentId,
@@ -216,6 +276,40 @@ const listGeneratedPlans = async ({ user, query = {} }) => {
   };
 };
 
+const listMyPlans = async ({ user }) => {
+  const studentId = user._id || user.id;
+  const AIPlan = require('../../models/AIPlan');
+  const Goal = require('../../models/Goal');
+  const DailyTask = require('../../models/DailyTask');
+
+  const plans = await AIPlan.find({ studentId }).sort({ createdAt: -1 }).lean();
+  
+  const results = [];
+  for (const plan of plans) {
+    const goal = await Goal.findById(plan.goalId).lean();
+    
+    const [totalTasks, completedTasks] = await Promise.all([
+      DailyTask.countDocuments({ planId: plan._id }),
+      DailyTask.countDocuments({ planId: plan._id, status: 'Completed' })
+    ]);
+    
+    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    
+    results.push({
+      planId: plan._id.toString(),
+      goalId: plan.goalId.toString(),
+      goalTitle: goal?.title || 'AI Study Plan',
+      category: goal?.goalType || 'CUSTOM',
+      createdAt: plan.createdAt,
+      progress,
+      targetDate: goal?.targetDate,
+      status: plan.status
+    });
+  }
+  
+  return results;
+};
+
 const removePlan = async ({ planId, user }) => {
   const plan = await findPlanById(planId);
 
@@ -227,6 +321,9 @@ const removePlan = async ({ planId, user }) => {
 
   await deletePlanById(planId);
 
+  const DailyTask = require('../../models/DailyTask');
+  await DailyTask.deleteMany({ planId });
+
   return { deleted: true };
 };
 
@@ -234,5 +331,6 @@ module.exports = {
   generatePlan,
   getPlan,
   listGeneratedPlans,
+  listMyPlans,
   removePlan,
 };

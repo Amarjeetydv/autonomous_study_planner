@@ -6,16 +6,48 @@ const stripCodeFences = (value = '') => String(value).replace(/```json/gi, '```'
 const extractJsonCandidate = (value = '') => {
   const text = stripCodeFences(value);
   const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
-  const firstBracket = text.indexOf('[');
-  const lastBracket = text.lastIndexOf(']');
-
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    return text.slice(firstBrace, lastBrace + 1);
+  if (firstBrace === -1) {
+    const firstBracket = text.indexOf('[');
+    if (firstBracket === -1) return text;
+    const lastBracket = text.lastIndexOf(']');
+    if (lastBracket !== -1 && lastBracket > firstBracket) {
+      return text.slice(firstBracket, lastBracket + 1);
+    }
+    return text;
+  }
+  
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = firstBrace; i < text.length; i++) {
+    const char = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{') {
+        depth++;
+      } else if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          return text.slice(firstBrace, i + 1);
+        }
+      }
+    }
   }
 
-  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-    return text.slice(firstBracket, lastBracket + 1);
+  const lastBrace = text.lastIndexOf('}');
+  if (lastBrace !== -1 && lastBrace > firstBrace) {
+    return text.slice(firstBrace, lastBrace + 1);
   }
 
   return text;

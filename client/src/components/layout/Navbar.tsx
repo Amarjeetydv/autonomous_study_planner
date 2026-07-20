@@ -4,7 +4,8 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { 
   User as UserIcon, LogOut, Settings, LayoutDashboard, 
-  Sparkles, Calendar, Trophy, ChevronDown, Menu, X, BookOpen
+  Sparkles, Calendar, Trophy, ChevronDown, Menu, X, BookOpen,
+  Users, BarChart3, LineChart, FolderKanban, MessageSquare, ShieldCheck, Target
 } from 'lucide-react';
 import { logout } from '../../features/auth/authSlice';
 import { RootState, AppDispatch } from '../../app/store';
@@ -83,13 +84,48 @@ export default function Navbar() {
     return user.name.charAt(0).toUpperCase();
   };
 
-  const navLinks = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'AI Companion', path: '/companion', icon: Sparkles },
-    { label: 'Calendar', path: '/calendar', icon: Calendar },
-    { label: 'Mastery', path: '/mastery', icon: BookOpen },
-    { label: 'Trophy Case', path: '/trophy', icon: Trophy },
-  ];
+  const isMentor = user?.roles?.includes('Mentor');
+  const isAdmin = user?.roles?.includes('Admin');
+
+  const getHomePath = () => {
+    if (isMentor) return '/mentor/dashboard';
+    if (isAdmin) return '/admin/dashboard';
+    return '/dashboard';
+  };
+
+  const getNavLinks = () => {
+    if (isMentor) {
+      return [
+        { label: 'Dashboard', path: '/mentor/dashboard', icon: LayoutDashboard },
+        { label: 'Students', path: '/mentor/students', icon: Users },
+        { label: 'Progress', path: '/mentor/progress', icon: BarChart3 },
+        { label: 'Analytics', path: '/mentor/analytics', icon: LineChart },
+        { label: 'Resources', path: '/mentor/resources', icon: FolderKanban },
+        { label: 'Messages', path: '/mentor/messages', icon: MessageSquare },
+        { label: 'Settings', path: '/mentor/settings', icon: Settings },
+      ];
+    }
+    if (isAdmin) {
+      return [
+        { label: 'Admin Panel', path: '/admin/dashboard', icon: ShieldCheck },
+        { label: 'Mentor Hub', path: '/mentor/dashboard', icon: Users },
+        { label: 'Student View', path: '/dashboard', icon: LayoutDashboard },
+      ];
+    }
+    // Student Links
+    return [
+      { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+      { label: 'AI Companion', path: '/companion', icon: Sparkles },
+      { label: 'Calendar', path: '/calendar', icon: Calendar },
+      { label: 'Mastery', path: '/mastery', icon: BookOpen },
+      { label: 'Goals', path: '/goals/new', icon: Target },
+      { label: 'Analytics', path: '/analytics', icon: LineChart },
+      { label: 'Trophies', path: '/trophy', icon: Trophy },
+    ];
+  };
+
+  const navLinks = getNavLinks();
+  const userRoleDisplay = isMentor ? 'Mentor' : isAdmin ? 'Admin' : 'Student';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
@@ -98,7 +134,7 @@ export default function Navbar() {
           
           {/* Brand Logo */}
           <div className="flex items-center gap-6">
-            <Link to="/dashboard" className="flex items-center gap-2 text-gradient font-extrabold text-xl tracking-tight">
+            <Link to={getHomePath()} className="flex items-center gap-2 text-gradient font-extrabold text-xl tracking-tight">
               <span className="h-9 w-9 rounded-xl bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400 text-lg">
                 🎓
               </span>
@@ -145,7 +181,7 @@ export default function Navbar() {
                     {user?.name || 'User'}
                   </div>
                   <div className="text-[10px] text-slate-400 max-w-[120px] truncate">
-                    {user?.email || 'user@example.com'}
+                    {userRoleDisplay}
                   </div>
                 </div>
 
@@ -162,25 +198,31 @@ export default function Navbar() {
                   
                   {/* User Profile Info Header */}
                   <div className="px-3 py-3 border-b border-slate-800/80 mb-1">
-                    <p className="text-sm font-bold text-white truncate">{user?.name || 'Amarjeet Yadav'}</p>
-                    <p className="text-xs text-slate-400 truncate mb-1.5">{user?.email || 'amarjeet@example.com'}</p>
-                    <span className="inline-block px-2 py-0.5 text-[10px] font-semibold bg-brand-500/10 border border-brand-500/20 text-brand-400 rounded-md uppercase tracking-wider">
-                      {user?.roles?.[0] || 'Student'}
+                    <p className="text-sm font-bold text-white truncate">{user?.name || 'User'}</p>
+                    <p className="text-xs text-slate-400 truncate mb-1.5">{user?.email || 'user@example.com'}</p>
+                    <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-md uppercase tracking-wider border ${
+                      isMentor 
+                        ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/30'
+                        : isAdmin
+                        ? 'bg-purple-950/80 text-purple-400 border-purple-500/30'
+                        : 'bg-brand-500/10 text-brand-400 border-brand-500/20'
+                    }`}>
+                      {userRoleDisplay}
                     </span>
                   </div>
 
                   {/* Dropdown Actions */}
                   <div className="space-y-0.5">
                     <Link
-                      to="/dashboard"
+                      to={isMentor ? '/mentor/dashboard' : isAdmin ? '/admin/dashboard' : '/dashboard'}
                       className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 rounded-xl hover:bg-slate-800/60 hover:text-white transition"
                     >
                       <UserIcon className="h-4 w-4 text-slate-400" />
-                      Profile
+                      Dashboard Profile
                     </Link>
 
                     <Link
-                      to="/dashboard"
+                      to={isMentor ? '/mentor/settings' : '/dashboard'}
                       className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 rounded-xl hover:bg-slate-800/60 hover:text-white transition"
                     >
                       <Settings className="h-4 w-4 text-slate-400" />
@@ -230,7 +272,7 @@ export default function Navbar() {
             </div>
             <div className="leading-tight overflow-hidden">
               <p className="text-sm font-bold text-white truncate">{user?.name || 'User'}</p>
-              <p className="text-xs text-slate-400 truncate">{user?.email || 'user@example.com'}</p>
+              <p className="text-xs text-slate-400 truncate">{userRoleDisplay}</p>
             </div>
           </div>
 

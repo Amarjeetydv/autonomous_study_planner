@@ -17,6 +17,7 @@ const notificationsRoutes = require('../../modules/notifications/notifications.r
 const achievementsRoutes = require('../../modules/gamification/achievements.routes');
 const levelRoutes = require('../../modules/gamification/level.routes');
 const mentorsRoutes = require('../../modules/mentors/mentors.routes');
+const messagesRoutes = require('../../modules/messages/messages.routes');
 const adminRoutes = require('../../modules/admin/admin.routes');
 
 const router = express.Router();
@@ -40,6 +41,8 @@ router.use('/notifications', notificationsRoutes);
 router.use('/achievements', achievementsRoutes);
 router.use('/level', levelRoutes);
 router.use('/mentors', mentorsRoutes);
+router.use('/mentor', mentorsRoutes);
+router.use('/messages', messagesRoutes);
 router.use('/admin', adminRoutes);
 
 module.exports = router;

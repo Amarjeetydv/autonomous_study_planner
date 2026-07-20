@@ -177,19 +177,46 @@ const createTasksFromPlan = async (plan) => {
       }
 
       dailyBlocks.forEach((block) => {
+        let startTime = '18:00';
+        let endTime = '19:00';
+        if (block.time && block.time.includes('-')) {
+          const parts = block.time.split('-');
+          startTime = parts[0].trim();
+          endTime = parts[1].trim();
+        } else if (block.time && block.time.toLowerCase() !== 'flexible') {
+          startTime = block.time.trim();
+          const duration = parseDurationToMinutes(block.durationMinutes || block.duration || 60);
+          const [h, m] = startTime.split(':').map(Number);
+          if (!isNaN(h) && !isNaN(m)) {
+            const endM = (m + duration) % 60;
+            const endH = (h + Math.floor((m + duration) / 60)) % 24;
+            endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+          }
+        }
+        
+        const weekNumber = Math.floor(i / 7) + 1;
+        const dayNumber = (i % 7) + 1;
+
         tasksToInsert.push({
           studentId: plan.studentId,
           goalId: plan.goalId,
           planId: plan._id,
           subjectId,
           title: block.task || 'AI Study Session',
-          description: `Time segment: ${block.duration || 'Flexible'} (${block.type || 'Study'})`,
+          description: `Time segment: ${block.time || 'Flexible'} (${block.type || 'Study'})`,
           taskType: block.type === 'Revision' ? 'Revision' : (block.type === 'Mock Test' ? 'Mock Test' : 'Study'),
           scheduledDate: new Date(currentDay),
-          estimatedDuration: parseDurationToMinutes(block.duration),
+          estimatedDuration: parseDurationToMinutes(block.durationMinutes || block.duration || 60),
           priority: 'Medium',
           status: 'Pending',
           aiGenerated: true,
+          plannedDate: new Date(currentDay),
+          plannedStartTime: startTime,
+          plannedEndTime: endTime,
+          timezone: goal.timezone || 'UTC',
+          weekNumber,
+          dayNumber,
+          isRescheduled: false,
         });
       });
     }
@@ -201,6 +228,10 @@ const createTasksFromPlan = async (plan) => {
       if (Number.isNaN(revDate.getTime())) {
         revDate = new Date();
       }
+      const daysDiff = Math.ceil((revDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const weekNumber = Math.max(1, Math.floor(daysDiff / 7) + 1);
+      const dayNumber = Math.max(1, (daysDiff % 7) + 1);
+
       tasksToInsert.push({
         studentId: plan.studentId,
         goalId: plan.goalId,
@@ -214,29 +245,47 @@ const createTasksFromPlan = async (plan) => {
         priority: 'High',
         status: 'Pending',
         aiGenerated: true,
+        plannedDate: revDate,
+        plannedStartTime: '09:00',
+        plannedEndTime: '09:45',
+        timezone: goal.timezone || 'UTC',
+        weekNumber,
+        dayNumber,
+        isRescheduled: false,
       });
     });
 
     // 3. Generate Mock Test Tasks
-    const mockTests = plan.quizPlan?.quizSchedule || [];
+    const mockTests = plan.quizPlan?.quizSchedule || plan.quizSchedule || [];
     mockTests.forEach((quiz) => {
-      let qDate = new Date(quiz.scheduledDate);
+      let qDate = new Date(quiz.date || quiz.scheduledDate);
       if (Number.isNaN(qDate.getTime())) {
         qDate = new Date();
       }
+      const daysDiff = Math.ceil((qDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const weekNumber = Math.max(1, Math.floor(daysDiff / 7) + 1);
+      const dayNumber = Math.max(1, (daysDiff % 7) + 1);
+
       tasksToInsert.push({
         studentId: plan.studentId,
         goalId: plan.goalId,
         planId: plan._id,
         subjectId,
-        title: `Mock Exam: ${quiz.examType}`,
-        description: `Diagnostic practice session.`,
+        title: `Mock Exam: ${quiz.type || quiz.examType || 'Practice Quiz'}`,
+        description: `Diagnostic practice session covering: ${quiz.focus || 'Current topics'}`,
         taskType: 'Mock Test',
         scheduledDate: qDate,
         estimatedDuration: quiz.durationMinutes || 120,
         priority: 'High',
         status: 'Pending',
         aiGenerated: true,
+        plannedDate: qDate,
+        plannedStartTime: '10:00',
+        plannedEndTime: '12:00',
+        timezone: goal.timezone || 'UTC',
+        weekNumber,
+        dayNumber,
+        isRescheduled: false,
       });
     });
 

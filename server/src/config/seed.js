@@ -118,6 +118,33 @@ const mockSubjects = [
         ]
       }
     ]
+  },
+  {
+    name: 'Web Development',
+    code: 'WEB101',
+    category: 'Computer Science',
+    description: 'Frontend, backend, React hooks, APIs, and modern web architectures.',
+    difficulty: 'medium',
+    color: '#10b981',
+    estimatedHours: 45,
+    topics: [
+      {
+        name: 'React Hooks',
+        description: 'useState, useEffect, useMemo, useCallback, and custom hooks.',
+        difficulty: 'medium',
+        order: 1,
+        estimatedTimeMinutes: 500,
+        subtopics: [
+          {
+            name: 'State & Effects',
+            description: 'Managing component state and side effects.',
+            learningObjective: 'Master state management with React Hooks.',
+            order: 1,
+            estimatedTimeMinutes: 180,
+          }
+        ]
+      }
+    ]
   }
 ];
 

@@ -52,11 +52,20 @@ const generateQuiz = async ({ userId, subjectId, topicId, difficulty = 'Medium',
     throw new AppError('No active study goal found. Please configure a goal first.', 404);
   }
 
-  const subject = await Subject.findById(subjectId);
+  let targetSubjectId = subjectId;
+  if (!targetSubjectId && goal.selectedSubjects && goal.selectedSubjects.length > 0) {
+    targetSubjectId = goal.selectedSubjects[0];
+  }
+  if (!targetSubjectId) {
+    const firstSub = await Subject.findOne().lean();
+    if (firstSub) targetSubjectId = firstSub._id;
+  }
+
+  const subject = targetSubjectId ? await Subject.findById(targetSubjectId) : null;
   const topic = topicId ? await Topic.findById(topicId) : null;
 
-  const subjectName = subject ? subject.name : 'General subject outline';
-  const topicName = topic ? topic.name : 'Core concepts';
+  const subjectName = subject ? subject.name : 'General Computer Science';
+  const topicName = topic ? topic.name : 'Core Concepts';
 
   const userPrompt = `
   SUBJECT: ${subjectName}
