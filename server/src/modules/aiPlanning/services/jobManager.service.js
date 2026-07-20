@@ -49,7 +49,6 @@ class JobManager {
     }
 
     this.activeWorkers++;
-
     this.runJob(jobId, studentId, goalId, options).finally(() => {
       this.activeWorkers--;
       this.processQueue();
@@ -57,6 +56,7 @@ class JobManager {
   }
 
   async runJob(jobId, studentId, goalId, options) {
+    let timeoutId;
     try {
       await PlanningJob.findByIdAndUpdate(jobId, { 
         status: 'running', 
@@ -65,7 +65,13 @@ class JobManager {
 
       const user = { _id: studentId, id: studentId, roles: ['Student'] };
       
-      const result = await aiPlanningService.generatePlan({
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new AppError('Planning timeout exceeded 30 seconds', 408));
+        }, 30000);
+      });
+
+      const planPromise = aiPlanningService.generatePlan({
         user,
         goalId,
         options,
@@ -76,15 +82,28 @@ class JobManager {
             throw new AppError('Planning job cancelled by user', 499);
           }
 
+          const stageMessages = {
+            goalAnalyzer: 'Assessing study workload and target timeline',
+            subjectPrioritizer: 'Ranking topic weightage and weaknesses',
+            scheduleGenerator: 'Structuring daily, weekly study blocks',
+            revisionPlanner: 'Injecting spaced repetition study checks',
+            mockTestPlanner: 'Scheduling practice quizzes and diagnostic exams',
+            motivation: 'Formulating productivity tips and final review',
+          };
+          const message = stageMessages[stage] || 'Processing plan stage...';
+
           await PlanningJob.findByIdAndUpdate(jobId, {
             currentStage: stage,
             progressPercentage: progress,
             $addToSet: { completedStages: stage }
           });
 
-          eventEmitter.emit(`job:${jobId}:progress`, { stage, progress, status: 'running' });
+          eventEmitter.emit(`job:${jobId}:progress`, { stage, progress, status: 'running', message });
         }
       });
+
+      const result = await Promise.race([planPromise, timeoutPromise]);
+      clearTimeout(timeoutId);
 
       const dailyTasksService = require('../../tasks/tasks.service');
       await dailyTasksService.createTasksFromPlan(result);
@@ -106,6 +125,7 @@ class JobManager {
 
       eventEmitter.emit(`job:${jobId}:completed`, { status: 'completed', planId: result.id || result._id });
     } catch (err) {
+      if (timeoutId) clearTimeout(timeoutId);
       const isCancelled = err.statusCode === 499;
       logger.error('Planning job finished execution', { jobId, error: err.message, stack: err.stack, cancelled: isCancelled });
       

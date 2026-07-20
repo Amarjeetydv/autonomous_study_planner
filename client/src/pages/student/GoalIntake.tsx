@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
-  ArrowLeft, ArrowRight, Check, Loader2, AlertCircle
+  ArrowLeft, ArrowRight, Check, Loader2, AlertCircle, Sparkles, Bot, CheckCircle2
 } from 'lucide-react';
 import apiClient from '../../services/api/client';
 import { toast } from '../../services/toast';
+import { parseGoalInput } from '../../services/ai/goalParser';
 
 interface Subject {
   id: string;
@@ -36,6 +37,8 @@ export default function GoalIntake() {
   const [step, setStep] = useState(1);
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [formError, setFormError] = useState('');
+  const [manualSubjectOverride, setManualSubjectOverride] = useState(false);
+  const [isAnalyzingGoal, setIsAnalyzingGoal] = useState(false);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -63,6 +66,25 @@ export default function GoalIntake() {
       return response.data.data.items as Subject[];
     }
   });
+
+  // Dynamic AI Detection for Goal Title (returns confidence, topic, duration, subject)
+  const detection = useMemo(() => {
+    return parseGoalInput(title, subjectsData || []);
+  }, [title, subjectsData]);
+
+  // Auto-fill target date or subject state when specific goal detected
+  useEffect(() => {
+    if (detection.isSpecific) {
+      if (detection.subjectId && (!selectedSubjects.length || selectedSubjects.length === 1)) {
+        if (!selectedSubjects.includes(detection.subjectId)) {
+          setSelectedSubjects([detection.subjectId]);
+        }
+      }
+      if (detection.suggestedTargetDate && !targetDate) {
+        setTargetDate(detection.suggestedTargetDate);
+      }
+    }
+  }, [detection, targetDate]);
 
   // Check for draft on mount
   useEffect(() => {
@@ -167,6 +189,14 @@ export default function GoalIntake() {
         setFormError('Target date must be in the future.');
         return;
       }
+
+      // Show small loading state while parsing goal
+      setIsAnalyzingGoal(true);
+      setTimeout(() => {
+        setIsAnalyzingGoal(false);
+        setStep(2);
+      }, 500);
+      return;
     }
     if (step === 2) {
       if (dailyStudyHours <= 0 || dailyStudyHours > 24) {
@@ -180,8 +210,12 @@ export default function GoalIntake() {
     }
     if (step === 3) {
       if (selectedSubjects.length === 0) {
-        setFormError('Please select at least one subject to study.');
-        return;
+        if (subjectsData && subjectsData.length > 0) {
+          setSelectedSubjects([subjectsData[0].id]);
+        } else {
+          setFormError('Please select at least one subject to study.');
+          return;
+        }
       }
     }
     setStep((prev) => prev + 1);
@@ -314,9 +348,27 @@ export default function GoalIntake() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="block w-full rounded-xl border border-slate-800 bg-slate-900/50 py-3 px-4 text-sm text-slate-100 outline-none transition focus:border-brand-500 focus:bg-slate-900"
-                  placeholder="e.g. Master Calculus & Algorithms, Pass GATE 2027"
+                  placeholder="e.g. Prepare Probability in 1 week, Learn DBMS Normalization, Master React Hooks"
                 />
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  Describe what you want to learn in natural language.
+                </span>
               </div>
+
+              {isAnalyzingGoal && (
+                <div className="flex flex-col items-center justify-center py-8 space-y-3 rounded-2xl bg-slate-900/40 border border-brand-500/20">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-2xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-400">
+                      <Bot className="w-6 h-6 animate-bounce" />
+                    </div>
+                    <Sparkles className="w-4 h-4 text-amber-400 absolute -top-1 -right-1 animate-pulse" />
+                  </div>
+                  <div className="text-center">
+                    <h4 className="font-bold text-sm text-white">AI Assistant Analyzing Goal...</h4>
+                    <p className="text-[11px] text-slate-400">Extracting focus topics & duration</p>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -439,98 +491,166 @@ export default function GoalIntake() {
           {/* STEP 3: Subject Selection & Classification */}
           {step === 3 && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-xl font-bold text-white">3. Curate your subjects list</h2>
-                <span className="text-xs text-brand-400 font-semibold">{selectedSubjects.length} Selected</span>
-              </div>
+              {detection.confidence >= 0.75 && !manualSubjectOverride ? (
+                /* Human-Friendly AI Goal Summary Card (Confidence >= 0.75) */
+                <div className="glass-panel rounded-2xl p-8 border border-brand-500/30 bg-gradient-to-b from-slate-900/90 to-slate-950 space-y-6 shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-2xl bg-brand-500/20 border border-brand-500/30 text-brand-400">
+                        <Bot className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-extrabold text-white">Goal Summary</h2>
+                        <p className="text-xs text-slate-400">We structured your learning focus automatically.</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      AI Configured
+                    </span>
+                  </div>
 
-              {isLoadingSubjects ? (
-                <div className="flex justify-center items-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-brand-500" />
+                  <div className="space-y-5">
+                    <div>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Goal</span>
+                      <p className="text-lg font-extrabold text-white">{title}</p>
+                    </div>
+
+                    <div className="border-t border-slate-800/80 pt-4">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">We'll build your study plan for</span>
+                      <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-brand-950/60 border border-brand-500/40 text-brand-300 text-sm font-bold shadow-inner">
+                        <span className="text-brand-400 text-base">•</span>
+                        {detection.topic || detection.subject}
+                      </div>
+                    </div>
+
+                    {detection.duration && (
+                      <div className="border-t border-slate-800/80 pt-4">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Estimated duration</span>
+                        <p className="text-sm font-extrabold text-emerald-400">{detection.duration} Days</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => setManualSubjectOverride(true)}
+                      className="text-xs text-slate-400 hover:text-slate-200 font-semibold flex items-center gap-1.5 transition"
+                    >
+                      ✏ Edit Goal
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold text-sm px-6 py-3 rounded-xl transition shadow-lg shadow-brand-500/20"
+                    >
+                      ✓ Looks Good
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="max-h-[350px] overflow-y-auto pr-2 space-y-4">
-                  {subjectsData && subjectsData.length > 0 ? (
-                    subjectsData.map((sub) => {
-                      const isSelected = selectedSubjects.includes(sub.id);
-                      const isStrong = strongSubjects.includes(sub.id);
-                      const isWeak = weakSubjects.includes(sub.id);
-                      const isPriority = prioritySubjects.includes(sub.id);
+                /* Display Normal Subject Selection Screen for Generic Goals (< 0.75) or Manual Edit */
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center mb-2">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">3. Curate your subjects list</h2>
+                      <p className="text-xs text-slate-400">Select the subjects you want to include in your study plan.</p>
+                    </div>
+                    <span className="text-xs text-brand-400 font-semibold">{selectedSubjects.length} Selected</span>
+                  </div>
 
-                      return (
-                        <div 
-                          key={sub.id} 
-                          className={`p-4 rounded-xl border transition-all ${
-                            isSelected ? 'bg-slate-900/80 border-slate-700' : 'bg-slate-900/20 border-slate-900/80'
-                          }`}
-                        >
-                          <div className="flex justify-between items-center mb-2">
-                            <label className="flex items-center gap-3 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleSubjectSelect(sub.id)}
-                                className="rounded text-brand-500 focus:ring-brand-500 bg-slate-950 border-slate-800"
-                              />
-                              <div>
-                                <span className="font-bold text-sm text-white block">{sub.name}</span>
-                                <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
-                                  {sub.code} • {sub.category}
+                  {isLoadingSubjects ? (
+                    <div className="flex justify-center items-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-brand-500" />
+                    </div>
+                  ) : (
+                    <div className="max-h-[350px] overflow-y-auto pr-2 space-y-4">
+                      {subjectsData && subjectsData.length > 0 ? (
+                        subjectsData.map((sub) => {
+                          const isSelected = selectedSubjects.includes(sub.id);
+                          const isStrong = strongSubjects.includes(sub.id);
+                          const isWeak = weakSubjects.includes(sub.id);
+                          const isPriority = prioritySubjects.includes(sub.id);
+
+                          return (
+                            <div 
+                              key={sub.id} 
+                              className={`p-4 rounded-xl border transition-all ${
+                                isSelected ? 'bg-slate-900/80 border-slate-700' : 'bg-slate-900/20 border-slate-900/80'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleSubjectSelect(sub.id)}
+                                    className="rounded text-brand-500 focus:ring-brand-500 bg-slate-950 border-slate-800"
+                                  />
+                                  <div>
+                                    <span className="font-bold text-sm text-white block">{sub.name}</span>
+                                    <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
+                                      {sub.code} • {sub.category}
+                                    </span>
+                                  </div>
+                                </label>
+                                <span 
+                                  className="text-[10px] px-2 py-0.5 rounded uppercase font-semibold tracking-wider text-slate-400 bg-slate-800"
+                                  style={{ color: sub.color }}
+                                >
+                                  {sub.difficulty}
                                 </span>
                               </div>
-                            </label>
-                            <span 
-                              className="text-[10px] px-2 py-0.5 rounded uppercase font-semibold tracking-wider text-slate-400 bg-slate-800"
-                              style={{ color: sub.color }}
-                            >
-                              {sub.difficulty}
-                            </span>
-                          </div>
 
-                          {/* Classification switches */}
-                          {isSelected && (
-                            <div className="flex gap-2 mt-3 pt-2 border-t border-slate-800/60">
-                              <button
-                                type="button"
-                                onClick={() => toggleClassification(sub.id, 'strong')}
-                                className={`text-[10px] px-3 py-1.5 rounded-lg border font-semibold transition ${
-                                  isStrong 
-                                    ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/40' 
-                                    : 'bg-slate-950/50 text-slate-400 border-slate-800 hover:border-slate-700'
-                                }`}
-                              >
-                                Strong Subject
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => toggleClassification(sub.id, 'weak')}
-                                className={`text-[10px] px-3 py-1.5 rounded-lg border font-semibold transition ${
-                                  isWeak 
-                                    ? 'bg-amber-950/40 text-amber-400 border-amber-500/40' 
-                                    : 'bg-slate-950/50 text-slate-400 border-slate-800 hover:border-slate-700'
-                                }`}
-                              >
-                                Weak Subject
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => toggleClassification(sub.id, 'priority')}
-                                className={`text-[10px] px-3 py-1.5 rounded-lg border font-semibold transition ${
-                                  isPriority 
-                                    ? 'bg-brand-950/40 text-brand-400 border-brand-500/40' 
-                                    : 'bg-slate-950/50 text-slate-400 border-slate-800 hover:border-slate-700'
-                                }`}
-                              >
-                                Priority
-                              </button>
+                              {/* Classification switches */}
+                              {isSelected && (
+                                <div className="flex gap-2 mt-3 pt-2 border-t border-slate-800/60">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleClassification(sub.id, 'strong')}
+                                    className={`text-[10px] px-3 py-1.5 rounded-lg border font-semibold transition ${
+                                      isStrong 
+                                        ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/40' 
+                                        : 'bg-slate-950/50 text-slate-400 border-slate-800 hover:border-slate-700'
+                                    }`}
+                                  >
+                                    Strong Subject
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleClassification(sub.id, 'weak')}
+                                    className={`text-[10px] px-3 py-1.5 rounded-lg border font-semibold transition ${
+                                      isWeak 
+                                        ? 'bg-amber-950/40 text-amber-400 border-amber-500/40' 
+                                        : 'bg-slate-950/50 text-slate-400 border-slate-800 hover:border-slate-700'
+                                    }`}
+                                  >
+                                    Weak Subject
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleClassification(sub.id, 'priority')}
+                                    className={`text-[10px] px-3 py-1.5 rounded-lg border font-semibold transition ${
+                                      isPriority 
+                                        ? 'bg-brand-950/40 text-brand-400 border-brand-500/40' 
+                                        : 'bg-slate-950/50 text-slate-400 border-slate-800 hover:border-slate-700'
+                                    }`}
+                                  >
+                                    Priority
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-6 text-slate-500 text-sm">
+                          No subjects configured in system. Please run database seeding.
                         </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-6 text-slate-500 text-sm">
-                      No subjects configured in system. Please run database seeding.
+                      )}
                     </div>
                   )}
                 </div>

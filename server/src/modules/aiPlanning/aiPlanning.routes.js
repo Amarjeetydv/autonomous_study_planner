@@ -11,6 +11,7 @@ const {
   getJobResultController,
   cancelJobController
 } = require('./aiPlanning.controller');
+const { subscribeToJobStreamController } = require('./sse.controller');
 const { 
   generatePlanValidators, 
   listPlanValidators, 
@@ -32,6 +33,7 @@ router.delete('/:planId', ...aiPlanWriteAccess, planIdParamValidator, validateRe
 // Async Job endpoints
 router.get('/job/:jobId', ...aiPlanAccess, jobIdParamValidator, validateRequest, getJobController);
 router.get('/job/:jobId/status', ...aiPlanAccess, jobIdParamValidator, validateRequest, getJobStatusController);
+router.get('/job/:jobId/stream', protect, jobIdParamValidator, validateRequest, subscribeToJobStreamController);
 router.get('/job/:jobId/result', ...aiPlanAccess, jobIdParamValidator, validateRequest, getJobResultController);
 router.delete('/job/:jobId', ...aiPlanWriteAccess, jobIdParamValidator, validateRequest, cancelJobController);
 

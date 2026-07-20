@@ -60,11 +60,21 @@ const subscribeToJobStream = async (req, res, jobId, user) => {
     return;
   }
 
+  const stageMessages = {
+    goalAnalyzer: 'Assessing study workload and target timeline',
+    subjectPrioritizer: 'Ranking topic weightage and weaknesses',
+    scheduleGenerator: 'Structuring daily, weekly study blocks',
+    revisionPlanner: 'Injecting spaced repetition study checks',
+    mockTestPlanner: 'Scheduling practice quizzes and diagnostic exams',
+    motivation: 'Formulating productivity tips and final review',
+  };
+
   if (job.status === 'running') {
     res.write(`event: progress\ndata: ${JSON.stringify({
       stage: job.currentStage,
       progress: job.progressPercentage,
-      status: 'running'
+      status: 'running',
+      message: stageMessages[job.currentStage] || 'Processing plan stage...'
     })}\n\n`);
   }
 
@@ -73,7 +83,8 @@ const subscribeToJobStream = async (req, res, jobId, user) => {
     res.write(`event: progress\ndata: ${JSON.stringify({
       stage: data.stage,
       progress: data.progress,
-      status: data.status
+      status: data.status,
+      message: data.message || stageMessages[data.stage] || 'Processing plan stage...'
     })}\n\n`);
   };
 
