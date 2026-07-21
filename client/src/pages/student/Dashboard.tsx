@@ -115,15 +115,34 @@ export default function Dashboard() {
 
   const startMockTestMutation = useMutation({
     mutationFn: async (mockTask: any) => {
-      if (mockTask.referencedQuizId) {
+      if (mockTask?.referencedQuizId) {
         return { quizId: mockTask.referencedQuizId };
       }
-      const res = await apiClient.post('/quizzes/generate', {
-        subjectId: mockTask.subjectId,
-        topicId: mockTask.topicId,
-        difficulty: mockTask.difficulty || 'Medium',
+      
+      const rawSub = mockTask?.subjectId;
+      let targetSubjectId = typeof rawSub === 'string' ? rawSub : (rawSub?._id || rawSub?.id);
+
+      if (!targetSubjectId && goalData?.selectedSubjects?.[0]) {
+        const firstSub = goalData.selectedSubjects[0];
+        targetSubjectId = typeof firstSub === 'string' ? firstSub : (firstSub?._id || firstSub?.id);
+      }
+
+      const payload: any = {
+        difficulty: mockTask?.difficulty || 'Medium',
         count: 5
-      });
+      };
+
+      if (targetSubjectId && typeof targetSubjectId === 'string' && targetSubjectId.length === 24) {
+        payload.subjectId = targetSubjectId;
+      }
+
+      const rawTopic = mockTask?.topicId;
+      const targetTopicId = typeof rawTopic === 'string' ? rawTopic : (rawTopic?._id || rawTopic?.id);
+      if (targetTopicId && typeof targetTopicId === 'string' && targetTopicId.length === 24) {
+        payload.topicId = targetTopicId;
+      }
+
+      const res = await apiClient.post('/quizzes/generate', payload);
       return { quizId: res.data?.data?.quiz?._id };
     },
     onSuccess: (data) => {

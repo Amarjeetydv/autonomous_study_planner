@@ -47,22 +47,25 @@ Only output raw JSON.
 `;
 
 const generateQuiz = async ({ userId, subjectId, topicId, difficulty = 'Medium', count = 5 }) => {
-  const goal = await Goal.findOne({ studentId: userId, status: 'active' });
+  let goal = await Goal.findOne({ studentId: userId, isCurrent: true }).lean();
   if (!goal) {
-    throw new AppError('No active study goal found. Please configure a goal first.', 404);
+    goal = await Goal.findOne({ studentId: userId, status: { $ne: 'archived' } }).sort({ createdAt: -1 }).lean();
   }
 
-  let targetSubjectId = subjectId;
-  if (!targetSubjectId && goal.selectedSubjects && goal.selectedSubjects.length > 0) {
-    targetSubjectId = goal.selectedSubjects[0];
+  let targetSubjectId = (typeof subjectId === 'object' && subjectId !== null) ? (subjectId._id || subjectId.id) : subjectId;
+  
+  if (!targetSubjectId && goal && goal.selectedSubjects && goal.selectedSubjects.length > 0) {
+    const firstSub = goal.selectedSubjects[0];
+    targetSubjectId = (typeof firstSub === 'object' && firstSub !== null) ? (firstSub._id || firstSub.id) : firstSub;
   }
+
   if (!targetSubjectId) {
     const firstSub = await Subject.findOne().lean();
     if (firstSub) targetSubjectId = firstSub._id;
   }
 
   const subject = targetSubjectId ? await Subject.findById(targetSubjectId) : null;
-  const topic = topicId ? await Topic.findById(topicId) : null;
+  const topic = (topicId && typeof topicId !== 'object') ? await Topic.findById(topicId) : null;
 
   const subjectName = subject ? subject.name : 'General Computer Science';
   const topicName = topic ? topic.name : 'Core Concepts';
