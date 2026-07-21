@@ -31,6 +31,22 @@ const listTasks = async ({ studentId, query = {} }) => {
   if (query.taskType) filter.taskType = query.taskType;
   if (query.goalId) filter.goalId = query.goalId;
 
+  if (!query.goalId && !query.planId) {
+    const AIPlan = require('../../models/AIPlan');
+    const DailyTask = require('../../models/DailyTask');
+    let activePlan = await AIPlan.findOne({ studentId, isCurrent: true }).sort({ updatedAt: -1 }).lean();
+    if (!activePlan) {
+      activePlan = await AIPlan.findOne({ studentId, status: 'active' }).sort({ createdAt: -1 }).lean();
+    }
+    if (activePlan) {
+      const existingCount = await DailyTask.countDocuments({ planId: activePlan._id });
+      if (existingCount === 0) {
+        await createTasksFromPlan(activePlan);
+      }
+      filter.planId = activePlan._id;
+    }
+  }
+
   if (query.from || query.to) {
     filter.scheduledDate = {};
     if (query.from) filter.scheduledDate.$gte = new Date(query.from);
@@ -40,28 +56,67 @@ const listTasks = async ({ studentId, query = {} }) => {
   return tasksRepository.find(filter);
 };
 
-const getTodayTasks = async (studentId) => {
+const getTodayTasks = async (studentId, query = {}) => {
+  const AIPlan = require('../../models/AIPlan');
+  const DailyTask = require('../../models/DailyTask');
+  let activePlan = await AIPlan.findOne({ studentId, isCurrent: true }).sort({ updatedAt: -1 }).lean();
+  if (!activePlan) {
+    activePlan = await AIPlan.findOne({ studentId, status: 'active' }).sort({ createdAt: -1 }).lean();
+  }
+
+  if (activePlan) {
+    const existingCount = await DailyTask.countDocuments({ planId: activePlan._id });
+    if (existingCount === 0) {
+      await createTasksFromPlan(activePlan);
+    }
+  }
+
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
 
-  return tasksRepository.find({
+  const filter = {
     studentId,
     scheduledDate: { $gte: startOfToday, $lte: endOfToday },
-  });
+  };
+
+  if (activePlan) {
+    filter.planId = activePlan._id;
+  }
+
+  return tasksRepository.find(filter);
 };
 
 const getUpcomingTasks = async (studentId) => {
+  const AIPlan = require('../../models/AIPlan');
+  const DailyTask = require('../../models/DailyTask');
+  let activePlan = await AIPlan.findOne({ studentId, isCurrent: true }).sort({ updatedAt: -1 }).lean();
+  if (!activePlan) {
+    activePlan = await AIPlan.findOne({ studentId, status: 'active' }).sort({ createdAt: -1 }).lean();
+  }
+
+  if (activePlan) {
+    const existingCount = await DailyTask.countDocuments({ planId: activePlan._id });
+    if (existingCount === 0) {
+      await createTasksFromPlan(activePlan);
+    }
+  }
   const startOfTomorrow = new Date();
   startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
   startOfTomorrow.setHours(0, 0, 0, 0);
 
-  return tasksRepository.find({
+  const filter = {
     studentId,
     scheduledDate: { $gte: startOfTomorrow },
-  });
+  };
+
+  if (activePlan) {
+    filter.planId = activePlan._id;
+  }
+
+  return tasksRepository.find(filter);
 };
 
 const updateTask = async ({ taskId, studentId, data }) => {
@@ -148,35 +203,46 @@ const skipTask = async ({ taskId, studentId, notes }) => {
   return updatedTask;
 };
 
-// AI Integration: Parser to generate study blocks
+// AI Integration: Parser to generate study blocks & calendar events
 const createTasksFromPlan = async (plan) => {
   try {
+    const DailyTask = require('../../models/DailyTask');
+    const Goal = require('../../models/Goal');
+    const CalendarEvent = require('../../models/CalendarEvent');
+
     const goal = await Goal.findById(plan.goalId);
     if (!goal) return [];
 
+    // Clear existing tasks & calendar events for this plan to avoid duplicates
+    await DailyTask.deleteMany({ planId: plan._id });
+    await CalendarEvent.deleteMany({ 'metadata.planId': plan._id });
+
     const tasksToInsert = [];
     const startDate = new Date();
-    const endDate = new Date(goal.targetDate);
-    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    
-    const breakDaysList = goal.breakDays || [];
+    startDate.setHours(0, 0, 0, 0);
 
-    // Resolve subject references from goal if possible
+    const targetDateObj = goal.targetDate ? new Date(goal.targetDate) : new Date(Date.now() + 7 * 86400000);
+    const totalDays = Math.max(1, Math.ceil((targetDateObj.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const breakDaysList = goal.breakDays || [];
     const subjectId = goal.selectedSubjects?.[0] || null;
 
-    // 1. Generate Daily study blocks tasks
+    // 1. Generate Daily study blocks tasks (starting from Day 0 = Today)
     const dailyBlocks = plan.scheduler?.dailyTasks || [];
+    const fallbackBlocks = dailyBlocks.length > 0 ? dailyBlocks : [
+      { task: 'Core Concepts & Study Session', time: '18:00 - 19:30', duration: 90, type: 'Study' },
+      { task: 'Practice Problem Solving & Notes', time: '20:00 - 21:00', duration: 60, type: 'Study' }
+    ];
+
     for (let i = 0; i <= totalDays; i++) {
       const currentDay = new Date(startDate);
       currentDay.setDate(startDate.getDate() + i);
 
-      // Check if it is a break day
       const dayName = currentDay.toLocaleDateString('en-US', { weekday: 'long' });
-      if (breakDaysList.includes(dayName)) {
+      if (breakDaysList.includes(dayName) && i > 0) {
         continue;
       }
 
-      dailyBlocks.forEach((block) => {
+      fallbackBlocks.forEach((block) => {
         let startTime = '18:00';
         let endTime = '19:00';
         if (block.time && block.time.includes('-')) {
@@ -203,7 +269,7 @@ const createTasksFromPlan = async (plan) => {
           planId: plan._id,
           subjectId,
           title: block.task || 'AI Study Session',
-          description: `Time segment: ${block.time || 'Flexible'} (${block.type || 'Study'})`,
+          description: `Study block session (${block.type || 'Study'}) - Time: ${block.time || 'Flexible'}`,
           taskType: block.type === 'Revision' ? 'Revision' : (block.type === 'Mock Test' ? 'Mock Test' : 'Study'),
           scheduledDate: new Date(currentDay),
           estimatedDuration: parseDurationToMinutes(block.durationMinutes || block.duration || 60),
@@ -228,7 +294,7 @@ const createTasksFromPlan = async (plan) => {
       if (Number.isNaN(revDate.getTime())) {
         revDate = new Date();
       }
-      const daysDiff = Math.ceil((revDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = Math.max(0, Math.ceil((revDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
       const weekNumber = Math.max(1, Math.floor(daysDiff / 7) + 1);
       const dayNumber = Math.max(1, (daysDiff % 7) + 1);
 
@@ -238,10 +304,10 @@ const createTasksFromPlan = async (plan) => {
         planId: plan._id,
         subjectId,
         title: `Revision: ${rev.topic}`,
-        description: `Spaced revision block. Logic: ${plan.revisionPlan?.logic || ''}`,
+        description: `Spaced revision session. Logic: ${plan.revisionPlan?.logic || 'Spaced retention'}`,
         taskType: 'Revision',
         scheduledDate: revDate,
-        estimatedDuration: 45, // default
+        estimatedDuration: 45,
         priority: 'High',
         status: 'Pending',
         aiGenerated: true,
@@ -262,7 +328,7 @@ const createTasksFromPlan = async (plan) => {
       if (Number.isNaN(qDate.getTime())) {
         qDate = new Date();
       }
-      const daysDiff = Math.ceil((qDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      const daysDiff = Math.max(0, Math.ceil((qDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
       const weekNumber = Math.max(1, Math.floor(daysDiff / 7) + 1);
       const dayNumber = Math.max(1, (daysDiff % 7) + 1);
 
@@ -272,16 +338,16 @@ const createTasksFromPlan = async (plan) => {
         planId: plan._id,
         subjectId,
         title: `Mock Exam: ${quiz.type || quiz.examType || 'Practice Quiz'}`,
-        description: `Diagnostic practice session covering: ${quiz.focus || 'Current topics'}`,
+        description: `Diagnostic practice quiz covering ${quiz.focus || 'Current topics'}`,
         taskType: 'Mock Test',
         scheduledDate: qDate,
-        estimatedDuration: quiz.durationMinutes || 120,
+        estimatedDuration: quiz.durationMinutes || 60,
         priority: 'High',
         status: 'Pending',
         aiGenerated: true,
         plannedDate: qDate,
         plannedStartTime: '10:00',
-        plannedEndTime: '12:00',
+        plannedEndTime: '11:00',
         timezone: goal.timezone || 'UTC',
         weekNumber,
         dayNumber,
@@ -290,13 +356,42 @@ const createTasksFromPlan = async (plan) => {
     });
 
     if (tasksToInsert.length > 0) {
-      await tasksRepository.insertMany(tasksToInsert);
-      logger.info(`Inserted ${tasksToInsert.length} study tasks dynamically for plan ${plan._id}`);
+      const insertedDocs = await tasksRepository.insertMany(tasksToInsert);
+      
+      const calendarEventsToInsert = insertedDocs.map((taskDoc) => {
+        const sTime = taskDoc.plannedStartTime || '18:00';
+        const eTime = taskDoc.plannedEndTime || '19:00';
+
+        const startDT = new Date(taskDoc.scheduledDate);
+        const [sh, sm] = sTime.split(':').map(Number);
+        if (!isNaN(sh) && !isNaN(sm)) startDT.setHours(sh, sm, 0, 0);
+
+        const endDT = new Date(taskDoc.scheduledDate);
+        const [eh, em] = eTime.split(':').map(Number);
+        if (!isNaN(eh) && !isNaN(em)) endDT.setHours(eh, em, 0, 0);
+
+        return {
+          userId: taskDoc.studentId,
+          title: taskDoc.title,
+          description: taskDoc.description,
+          eventType: taskDoc.taskType === 'Mock Test' ? 'quiz' : (taskDoc.taskType === 'Revision' ? 'reminder' : 'studyBlock'),
+          startDateTime: startDT,
+          endDateTime: endDT,
+          status: 'scheduled',
+          sourceType: 'task',
+          sourceId: taskDoc._id,
+          metadata: { planId: taskDoc.planId, goalId: taskDoc.goalId }
+        };
+      });
+
+      await CalendarEvent.insertMany(calendarEventsToInsert);
+      logger.info(`Inserted ${insertedDocs.length} tasks & ${calendarEventsToInsert.length} calendar events for plan ${plan._id}`);
+      return insertedDocs;
     }
 
-    return tasksToInsert;
+    return [];
   } catch (err) {
-    logger.error('Failed to create tasks from AIPlan', { planId: plan._id, error: err.message });
+    logger.error('Failed to create tasks from AIPlan', { planId: plan._id, error: err.message, stack: err.stack });
     return [];
   }
 };

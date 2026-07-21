@@ -190,6 +190,24 @@ export default function Dashboard() {
     }
   });
 
+  const activatePlanMutation = useMutation({
+    mutationFn: async (planId: string) => {
+      await apiClient.post(`/planner/${planId}/activate`);
+    },
+    onSuccess: () => {
+      toast.success('Switched to selected study plan workspace.', 'Workspace Activated');
+      queryClient.invalidateQueries({ queryKey: ['activePlan'] });
+      queryClient.invalidateQueries({ queryKey: ['activeGoal'] });
+      queryClient.invalidateQueries({ queryKey: ['todayTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['calendarEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['myPlans'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to switch study plan workspace.', 'Error');
+    }
+  });
+
   const deletePlanMutation = useMutation({
     mutationFn: async (planId: string) => {
       await apiClient.delete(`/planner/${planId}`);
@@ -267,10 +285,10 @@ export default function Dashboard() {
   const { data: goalData } = useQuery({
     queryKey: ['activeGoal'],
     queryFn: async () => {
-      const response = await apiClient.get('/goals?status=active&limit=1');
-      return response.data.data.items?.[0] || null;
+      const response = await apiClient.get('/goals/active');
+      return response.data?.data?.goal || null;
     },
-    staleTime: 1000 * 60 * 2,
+    staleTime: 0,
   });
 
   // Fetch user profile
@@ -466,6 +484,14 @@ export default function Dashboard() {
   const tomorrowStr = tomorrow.toDateString();
   const tomorrowTasks = allTasks.filter(t => new Date(t.scheduledDate).toDateString() === tomorrowStr && t.status !== 'Skipped');
 
+  const futureUpcomingTasks = allTasks.filter(t => {
+    const d = new Date(t.scheduledDate);
+    d.setHours(0, 0, 0, 0);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return d > now && t.status !== 'Skipped';
+  });
+
   // Next 7 days grouping
   const upcomingWeekByDay: { [key: string]: any[] } = {};
   const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -529,10 +555,14 @@ export default function Dashboard() {
     );
   }
 
-  // Calculate day details for Hero Card
-  const totalGoalDays = goalData ? Math.ceil((new Date(goalData.targetDate).getTime() - new Date(goalData.createdAt || Date.now()).getTime()) / (1000 * 60 * 60 * 24)) : 30;
-  const currentDayNum = goalData ? Math.max(1, Math.ceil((Date.now() - new Date(goalData.createdAt || Date.now()).getTime()) / (1000 * 60 * 60 * 24))) : 3;
-  const totalWeeks = Math.ceil(totalGoalDays / 7) || 12;
+  // Calculate day details for Hero Card strictly based on targetDate - currentDate
+  const targetTime = goalData?.targetDate ? new Date(goalData.targetDate).getTime() : Date.now() + 7 * 24 * 60 * 60 * 1000;
+  const createdTime = goalData?.createdAt ? new Date(goalData.createdAt).getTime() : Date.now();
+
+  const totalGoalDays = Math.max(1, Math.ceil((targetTime - createdTime) / (1000 * 60 * 60 * 24)));
+  const remainingDays = Math.max(1, Math.ceil((targetTime - Date.now()) / (1000 * 60 * 60 * 24)));
+  const currentDayNum = Math.max(1, Math.min(totalGoalDays, Math.ceil((Date.now() - createdTime) / (1000 * 60 * 60 * 24)) || 1));
+  const totalWeeks = Math.max(1, Math.ceil(remainingDays / 7));
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 py-10 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
@@ -558,7 +588,9 @@ export default function Dashboard() {
             <div className="flex flex-wrap gap-4 text-xs">
               <div className="bg-slate-900/60 border border-slate-850 rounded-xl p-3">
                 <span className="text-slate-500 text-[9px] uppercase font-bold block">Current Timeline</span>
-                <span className="text-white font-extrabold block mt-0.5">Day {currentDayNum} of {totalWeeks} Weeks</span>
+                <span className="text-white font-extrabold block mt-0.5">
+                  {remainingDays} Days ({totalWeeks} {totalWeeks === 1 ? 'Week' : 'Weeks'})
+                </span>
               </div>
               <div className="bg-slate-900/60 border border-slate-850 rounded-xl p-3">
                 <span className="text-slate-500 text-[9px] uppercase font-bold block">Focus Time Logged</span>
@@ -734,6 +766,28 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
+              ) : futureUpcomingTasks.length > 0 ? (
+                <div className="p-6 rounded-2xl bg-slate-900/30 border border-brand-500/20 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <span className="text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-brand-500/15 text-brand-400 border border-brand-500/20">
+                        Next Available Study Session
+                      </span>
+                      <h3 className="font-extrabold text-white text-base mt-2">{futureUpcomingTasks[0].title}</h3>
+                      <p className="text-xs text-slate-400 mt-1">{futureUpcomingTasks[0].description}</p>
+                      <span className="text-xs text-brand-400 font-bold block mt-2">
+                        Scheduled for: {new Date(futureUpcomingTasks[0].scheduledDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} ({futureUpcomingTasks[0].estimatedDuration} mins)
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => updateStatusMutation.mutate({ taskId: futureUpcomingTasks[0]._id, status: 'In Progress' })}
+                      className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs px-5 py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 shrink-0"
+                    >
+                      <Play className="h-4 w-4" />
+                      Start Session Early
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="text-center py-12 bg-slate-900/10 rounded-2xl border border-slate-900">
                   <CheckCircle className="h-10 w-10 text-slate-650 mx-auto mb-3" />
@@ -859,11 +913,11 @@ export default function Dashboard() {
                           </span>
                         </div>
                         <span className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded border ${
-                          plan.progress === 100
-                            ? 'bg-emerald-950/20 text-emerald-400 border-emerald-500/20' 
-                            : 'bg-brand-950/20 text-brand-400 border-brand-500/20'
+                          plan.isCurrent
+                            ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/30 font-extrabold' 
+                            : 'bg-slate-950 text-slate-400 border-slate-800'
                         }`}>
-                          {plan.progress === 100 ? 'Completed' : 'Active'}
+                          {plan.isCurrent ? 'Active Workspace' : 'Available'}
                         </span>
                       </div>
                       
@@ -879,10 +933,21 @@ export default function Dashboard() {
 
                       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-900/60">
                         <button
-                          onClick={() => navigate(`/planner/${plan.planId}`)}
-                          className="bg-brand-500 hover:bg-brand-600 text-white rounded py-1 px-2 text-[9px] font-bold transition"
+                          onClick={() => activatePlanMutation.mutate(plan.planId)}
+                          disabled={activatePlanMutation.isPending}
+                          className={`${
+                            plan.isCurrent
+                              ? 'bg-emerald-600 hover:bg-emerald-700'
+                              : 'bg-brand-500 hover:bg-brand-600'
+                          } text-white rounded py-1 px-2.5 text-[9px] font-extrabold transition disabled:opacity-50 flex items-center gap-1`}
                         >
-                          Continue
+                          {plan.isCurrent ? 'Current Workspace' : 'Continue Workspace'}
+                        </button>
+                        <button
+                          onClick={() => navigate(`/planner/${plan.planId}`)}
+                          className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded py-1 px-2 text-[9px] font-semibold transition"
+                        >
+                          View Roadmap
                         </button>
                         <button
                           onClick={() => regenerateMutation.mutate(plan.goalId)}

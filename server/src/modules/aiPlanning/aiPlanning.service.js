@@ -192,7 +192,7 @@ const generatePlan = async ({ user, goalId, options = {}, onProgress = null }) =
     goalId: goal._id,
     studyPlanId: options.studyPlanId || null,
     progressId: progressDocs[0]?._id || null,
-    status: AI_PLAN_STATUSES.GENERATED,
+    status: AI_PLAN_STATUSES.ACTIVE,
     promptVersion: goalAnalysisStage.promptVersion,
     generatedAt: new Date(),
     goalAnalysis: goalAnalysisStage.output,
@@ -232,9 +232,65 @@ const generatePlan = async ({ user, goalId, options = {}, onProgress = null }) =
     }),
   });
 
+  // Unset isCurrent on previous plans and goals for this student (do not archive them!)
+  const AIPlanModel = require('../../models/AIPlan');
+  const GoalModel = require('../../models/Goal');
+
+  await AIPlanModel.updateMany(
+    { studentId: goal.studentId },
+    { $set: { isCurrent: false } }
+  );
+  await GoalModel.updateMany(
+    { studentId: goal.studentId },
+    { $set: { isCurrent: false } }
+  );
+  await GoalModel.findByIdAndUpdate(goal._id, { $set: { isCurrent: true, status: 'active' } });
+
+  finalPlan.isCurrent = true;
+  finalPlan.status = 'active';
   const savedPlan = await createPlan(finalPlan);
 
+  // Automatically insert DailyTask and CalendarEvent documents in MongoDB
+  const tasksService = require('../tasks/tasks.service');
+  await tasksService.createTasksFromPlan(savedPlan);
+
   return mapPlanRecord(savedPlan);
+};
+
+const activatePlan = async ({ planId, user }) => {
+  const studentId = user._id || user.id;
+  const AIPlanModel = require('../../models/AIPlan');
+  const GoalModel = require('../../models/Goal');
+
+  const plan = await AIPlanModel.findOne({ _id: planId, studentId }).lean();
+  if (!plan) {
+    throw new AppError('AI plan not found', 404);
+  }
+
+  // Unset isCurrent on all plans & goals for student
+  await AIPlanModel.updateMany({ studentId }, { $set: { isCurrent: false } });
+  await GoalModel.updateMany({ studentId }, { $set: { isCurrent: false } });
+
+  // Set selected plan & its goal to isCurrent = true
+  await AIPlanModel.findByIdAndUpdate(planId, { $set: { isCurrent: true, status: 'active' } });
+  if (plan.goalId) {
+    await GoalModel.findByIdAndUpdate(plan.goalId, { $set: { isCurrent: true, status: 'active' } });
+  }
+
+  const updatedPlan = await AIPlanModel.findById(planId).lean();
+  return mapPlanRecord(updatedPlan);
+};
+
+const getActivePlan = async ({ user }) => {
+  const studentId = user._id || user.id;
+  const AIPlanModel = require('../../models/AIPlan');
+
+  let plan = await AIPlanModel.findOne({ studentId, isCurrent: true }).sort({ updatedAt: -1 }).lean();
+  if (!plan) {
+    plan = await AIPlanModel.findOne({ studentId, status: { $ne: 'archived' } }).sort({ createdAt: -1 }).lean();
+  }
+  if (!plan) return null;
+  return mapPlanRecord(plan);
 };
 
 const getPlan = async ({ planId, user }) => {
@@ -297,13 +353,14 @@ const listMyPlans = async ({ user }) => {
     
     results.push({
       planId: plan._id.toString(),
-      goalId: plan.goalId.toString(),
+      goalId: plan.goalId?.toString() || '',
       goalTitle: goal?.title || 'AI Study Plan',
       category: goal?.goalType || 'CUSTOM',
       createdAt: plan.createdAt,
       progress,
       targetDate: goal?.targetDate,
-      status: plan.status
+      status: plan.status,
+      isCurrent: Boolean(plan.isCurrent)
     });
   }
   
@@ -330,6 +387,8 @@ const removePlan = async ({ planId, user }) => {
 module.exports = {
   generatePlan,
   getPlan,
+  getActivePlan,
+  activatePlan,
   listGeneratedPlans,
   listMyPlans,
   removePlan,

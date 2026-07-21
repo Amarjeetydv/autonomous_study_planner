@@ -180,19 +180,30 @@ const createGoal = async ({ user, data }) => {
   const userId = user._id || user.id;
   const goalType = String(data.goalType).toUpperCase();
 
-  const activeGoal = await Goal.findOne({ studentId: userId, goalType, status: 'active' }).lean();
-  if (activeGoal) {
-    const error = new AppError('You already have an active study goal in this category.', 409);
-    error.code = 'ACTIVE_GOAL_EXISTS';
-    error.data = {
-      goalId: activeGoal._id.toString(),
-      title: activeGoal.title,
-      category: activeGoal.goalType,
-    };
-    throw error;
-  }
+  // Unset isCurrent on previous goals for this student (do not archive them!)
+  await Goal.updateMany(
+    { studentId: userId },
+    { $set: { isCurrent: false } }
+  );
 
-  const goal = await goalsRepository.create(await buildGoalData({ data: { ...data, goalType }, userId }));
+  const goalDataToCreate = await buildGoalData({ data: { ...data, goalType }, userId, status: GOAL_STATUS.ACTIVE });
+  goalDataToCreate.isCurrent = true;
+  const goal = await goalsRepository.create(goalDataToCreate);
+
+  return toGoalView(goal);
+};
+
+const getActiveGoal = async ({ user }) => {
+  const userId = user._id || user.id;
+  const goal = await Goal.findOne({ studentId: userId, isCurrent: true })
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  if (!goal) {
+    const latestGoal = await Goal.findOne({ studentId: userId, status: { $ne: GOAL_STATUS.ARCHIVED } }).sort({ createdAt: -1 }).lean();
+    if (!latestGoal) return null;
+    return toGoalView(latestGoal);
+  }
 
   return toGoalView(goal);
 };
@@ -435,6 +446,7 @@ const duplicateGoal = async ({ goalId, user, title }) => {
 module.exports = {
   listGoals,
   createGoal,
+  getActiveGoal,
   getGoalById,
   updateGoal,
   deleteGoal,

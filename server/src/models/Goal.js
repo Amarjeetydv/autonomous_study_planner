@@ -64,6 +64,7 @@ const goalSchema = new mongoose.Schema(
       color: { type: String, default: '#4f46e5' },
     },
     status: { type: String, enum: ['active', 'paused', 'completed', 'archived'], default: 'active', index: true },
+    isCurrent: { type: Boolean, default: true, index: true },
     pausedAt: { type: Date, default: null },
     archivedAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
@@ -72,7 +73,7 @@ const goalSchema = new mongoose.Schema(
   { timestamps: true, collection: 'Goals' }
 );
 
-goalSchema.index({ studentId: 1, goalType: 1, status: 1 }, { unique: true, partialFilterExpression: { status: 'active' } });
+goalSchema.index({ studentId: 1, isCurrent: 1 });
 goalSchema.index({ studentId: 1, status: 1 });
 goalSchema.index({ studentId: 1, targetDate: 1 });
 goalSchema.index({ goalType: 1, status: 1 });

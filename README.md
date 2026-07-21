@@ -57,8 +57,11 @@ flowchart TD
 - **Mock Test Planner Agent**: Schedules full-length simulated mock tests prior to exam dates.
 - **Motivation Agent**: Delivers personalized encouragement strategies based on student performance.
 
-### 📊 2. AI Daily Planner Workspace
-- **Motion/Sunsama-Style Workspace**: Hero greeting card, today's focus checklist, tomorrow preview, collapsible week accordion, and space repetition stats.
+### 📊 2. AI Daily Planner & Independent Workspaces
+- **Notion/Linear-Style Independent Workspaces**: Every generated study plan operates as an independent workspace pointer (`isCurrent: true/false`). Students can maintain multiple concurrent study plans (e.g. UPSC, DBMS, OS, React) without forced plan archiving.
+- **1-Click Workspace Switching**: Switch active workspace pointers instantly with real-time React Query cache invalidation across Today's Tasks, Tomorrow Preview, Upcoming Week, Mock Exams, and Calendar.
+- **Auto Task & Calendar Synchronizer**: Synchronously inserts `DailyTask` documents (Day 0 / Today through target date) and `CalendarEvent` documents into MongoDB. Features a self-healing auto-regeneration engine if task documents are missing.
+- **Motion/Sunsama-Style Daily Planner**: Hero greeting card, today's focus checklist, next available study session card, tomorrow preview, collapsible week accordion, and spaced repetition stats.
 - **Goal Intake Wizard**: Natural language domain & topic inference, target score settings, and native study/break days selection.
 - **Interactive Calendar Suite**: Visual study blocks, drag-and-drop reschedule previews, color-coded event status, and calendar synchronization.
 - **Knowledge Mastery**: Subject mastery heatmaps, XP gamification, study streak counters, and performance analytics.

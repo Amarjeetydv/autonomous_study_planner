@@ -3,6 +3,8 @@ const { protect, authorizeRoles } = require('../auth/auth.middleware');
 const validateRequest = require('../../middlewares/validateRequest.middleware');
 const { 
   listMyPlansController,
+  activatePlanController,
+  getActivePlanController,
   generatePlanController, 
   getPlanController, 
   listPlansController, 
@@ -29,6 +31,8 @@ router.get('/', ...aiPlanAccess, listPlanValidators, validateRequest, listPlansC
 router.get('/history', ...aiPlanAccess, listPlanValidators, validateRequest, listPlansController);
 router.post('/generate', ...aiPlanWriteAccess, generatePlanValidators, validateRequest, generatePlanController);
 router.get('/my', ...aiPlanAccess, listMyPlansController);
+router.get('/my/active', ...aiPlanAccess, getActivePlanController);
+router.post('/:planId/activate', ...aiPlanWriteAccess, planIdParamValidator, validateRequest, activatePlanController);
 router.get('/:planId', ...aiPlanAccess, planIdParamValidator, validateRequest, getPlanController);
 router.delete('/:planId', ...aiPlanWriteAccess, planIdParamValidator, validateRequest, deletePlanController);
 

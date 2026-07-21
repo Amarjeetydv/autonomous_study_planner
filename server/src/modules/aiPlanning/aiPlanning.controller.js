@@ -1,6 +1,6 @@
 const asyncHandler = require('../../middlewares/asyncHandler');
 const { sendResponse, sendPaginatedResponse } = require('../../utils/response');
-const { generatePlan, getPlan, listGeneratedPlans, listMyPlans, removePlan } = require('./aiPlanning.service');
+const { generatePlan, getPlan, getActivePlan, activatePlan, listGeneratedPlans, listMyPlans, removePlan } = require('./aiPlanning.service');
 const jobManager = require('./services/jobManager.service');
 
 const listMyPlansController = asyncHandler(async (req, res) => {
@@ -9,6 +9,26 @@ const listMyPlansController = asyncHandler(async (req, res) => {
     success: true,
     message: 'My plans fetched successfully',
     data: { plans },
+    errors: [],
+  });
+});
+
+const activatePlanController = asyncHandler(async (req, res) => {
+  const plan = await activatePlan({ planId: req.params.planId, user: req.user });
+  return sendResponse(res, {
+    success: true,
+    message: 'Study plan activated successfully',
+    data: { plan },
+    errors: [],
+  });
+});
+
+const getActivePlanController = asyncHandler(async (req, res) => {
+  const plan = await getActivePlan({ user: req.user });
+  return sendResponse(res, {
+    success: true,
+    message: 'Active study plan fetched successfully',
+    data: { plan },
     errors: [],
   });
 });
@@ -115,6 +135,8 @@ const cancelJobController = asyncHandler(async (req, res) => {
 
 module.exports = {
   listMyPlansController,
+  activatePlanController,
+  getActivePlanController,
   generatePlanController,
   getPlanController,
   listPlansController,

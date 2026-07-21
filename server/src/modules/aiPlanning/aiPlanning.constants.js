@@ -1,8 +1,8 @@
 const AI_PLAN_STATUSES = {
   DRAFT: 'draft',
-  GENERATED: 'generated',
-  VALIDATED: 'validated',
-  REJECTED: 'rejected',
+  GENERATING: 'generating',
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
   ARCHIVED: 'archived',
 };
 

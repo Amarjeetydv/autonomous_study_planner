@@ -3,6 +3,7 @@ const { sendResponse, sendPaginatedResponse } = require('../../utils/response');
 const {
   listGoals,
   createGoal,
+  getActiveGoal,
   getGoalById,
   updateGoal,
   deleteGoal,
@@ -40,6 +41,17 @@ const createGoalController = asyncHandler(async (req, res) => {
     },
     201
   );
+});
+
+const getActiveGoalController = asyncHandler(async (req, res) => {
+  const goal = await getActiveGoal({ user: req.user });
+
+  return sendResponse(res, {
+    success: true,
+    message: 'Active goal retrieved successfully',
+    data: { goal },
+    errors: [],
+  });
 });
 
 const getGoalController = asyncHandler(async (req, res) => {
@@ -133,6 +145,7 @@ const duplicateGoalController = asyncHandler(async (req, res) => {
 module.exports = {
   listGoalsController,
   createGoalController,
+  getActiveGoalController,
   getGoalController,
   updateGoalController,
   deleteGoalController,

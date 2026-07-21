@@ -4,6 +4,7 @@ const validateRequest = require('../../middlewares/validateRequest.middleware');
 const {
   listGoalsController,
   createGoalController,
+  getActiveGoalController,
   getGoalController,
   updateGoalController,
   deleteGoalController,
@@ -21,6 +22,7 @@ const authenticatedViewer = [protect, authorizeRoles('Student', 'Mentor', 'Admin
 const studentWriter = [protect, authorizeRoles('Student', 'Admin')];
 
 router.get('/', ...authenticatedViewer, listQueryValidators, validateRequest, listGoalsController);
+router.get('/active', ...authenticatedViewer, getActiveGoalController);
 router.post('/', ...studentWriter, createGoalValidators, validateRequest, createGoalController);
 router.get('/:goalId', ...authenticatedViewer, goalIdParamValidator, validateRequest, getGoalController);
 router.patch('/:goalId', ...studentWriter, goalIdParamValidator, updateGoalValidators, validateRequest, updateGoalController);

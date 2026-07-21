@@ -13,6 +13,20 @@ const connectDB = async () => {
     });
 
     logger.info('MongoDB connected successfully');
+
+    // Clean up obsolete unique indexes on Goals collection that block multiple active goals
+    try {
+      const goalsCollection = mongoose.connection.collection('Goals');
+      const indexes = await goalsCollection.indexes();
+      for (const idx of indexes) {
+        if (idx.unique && (idx.name.includes('studentId') || idx.name.includes('goalType'))) {
+          logger.info(`Dropping legacy unique index from Goals collection: ${idx.name}`);
+          await goalsCollection.dropIndex(idx.name);
+        }
+      }
+    } catch (indexErr) {
+      logger.warn('Index migration check finished', { message: indexErr.message });
+    }
   } catch (error) {
     logger.error('MongoDB connection failed', { error: error.message });
     throw error;
